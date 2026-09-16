@@ -4150,6 +4150,7 @@ function App() {
                     onClose={() => setSelectedMod(null)}
                     characterData={characterData}
                     onUpdateMod={() => handleInitiateUpdate(selectedMod)}
+                    onShowInAssetExplorer={() => handleShowInAssetExplorer([selectedMod.path])}
                   />
                 </div>
 

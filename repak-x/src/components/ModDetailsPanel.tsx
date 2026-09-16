@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { Tooltip } from '@mui/material'
 import { FaTag, FaExchangeAlt } from "react-icons/fa"
+import { VscListTree } from "react-icons/vsc"
 import FileTree from './FileTree'
 import { formatFileSize } from '../utils/format'
 import { detectHeroesWithData } from '../utils/heroes'
@@ -42,9 +43,10 @@ type ModDetailsPanelProps = {
   onClose?: () => void
   characterData?: CharacterDataEntry[]
   onUpdateMod?: () => void
+  onShowInAssetExplorer?: () => void
 }
 
-export default function ModDetailsPanel({ mod, initialDetails, onClose, characterData = [], onUpdateMod }: ModDetailsPanelProps) {
+export default function ModDetailsPanel({ mod, initialDetails, onClose, characterData = [], onUpdateMod, onShowInAssetExplorer }: ModDetailsPanelProps) {
   // Repaint when the synced hero portraits finish loading.
   useHeroImages()
   const [details, setDetails] = useState<ModDetailsData | null>(initialDetails || null)
@@ -313,26 +315,35 @@ export default function ModDetailsPanel({ mod, initialDetails, onClose, characte
             <div className="detail-section">
               <div className="detail-section-header">
                 <h3>File Contents ({details.file_count} files)</h3>
-                <button
-                  className="copy-paths-btn"
-                  onClick={() => {
-                    const allPaths = (details.files || [])
-                      .map(p => p.replace(/^\/Game\//i, ''))
-                      .join('\n')
-                    navigator.clipboard.writeText(allPaths).then(() => {
-                      // Show feedback
-                      const btn = document.querySelector('.copy-paths-btn')
-                      if (btn) {
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    className="copy-paths-btn"
+                    onClick={(e) => {
+                      const allPaths = (details.files || [])
+                        .map(p => p.replace(/^\/Game\//i, ''))
+                        .join('\n')
+                      navigator.clipboard.writeText(allPaths).then(() => {
+                        // Show feedback
+                        const btn = e.currentTarget
                         const original = btn.textContent
                         btn.textContent = 'Copied!'
-                        setTimeout(() => btn.textContent = original, 1500)
-                      }
-                    })
-                  }}
-                  title="Copy all file paths to clipboard"
-                >
-                  Copy All Paths
-                </button>
+                        setTimeout(() => { btn.textContent = original }, 1500)
+                      })
+                    }}
+                    title="Copy all file paths to clipboard"
+                  >
+                    Copy Paths
+                  </button>
+                  {onShowInAssetExplorer && (
+                    <button
+                      className="copy-paths-btn icon-only"
+                      onClick={onShowInAssetExplorer}
+                      title="Show in Asset Explorer"
+                    >
+                      <VscListTree />
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="file-list-container" style={{ border: '1px solid var(--panel-border)', borderRadius: '4px', background: 'var(--bg-darker)' }}>
                 <FileTree files={details.files} />

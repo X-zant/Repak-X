@@ -19,6 +19,13 @@ export function detectHeroes(files: string[]): string[] {
     const filenameRegex = /[_/](10[1-6]\d)(\d{3})/;
 
     files.forEach(file => {
+        // WBP_Galacta has no numeric hero ID in its path/filename, so it's
+        // special-cased directly by name (mirrors backend logic).
+        if (file.toLowerCase().includes('wbp_galacta')) {
+            heroIds.add('4017');
+            return;
+        }
+
         // Check path first - primary detection method
         const pathMatch = file.match(pathRegex);
         if (pathMatch) {
@@ -62,6 +69,13 @@ export function detectHeroesWithData(files: string[], characterData: any[]): str
     const filenameRegex = /[_/](10[1-6]\d)(\d{3})/;
 
     files.forEach(file => {
+        // WBP_Galacta has no numeric hero ID in its path/filename, so it's
+        // special-cased directly by name (mirrors backend logic).
+        if (file.toLowerCase().includes('wbp_galacta')) {
+            heroIds.add('4017');
+            return;
+        }
+
         const pathMatch = file.match(pathRegex);
         if (pathMatch) {
             heroIds.add(pathMatch[1]);

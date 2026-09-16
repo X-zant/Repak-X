@@ -146,6 +146,7 @@ pub fn get_pak_characteristics_detailed(mod_contents: Vec<String>) -> ModCharact
     let mut character_name: Option<String> = None; // Full skin-specific name (e.g., "Hawkeye - Default")
     let mut hero_names: HashSet<String> = HashSet::new(); // All detected hero names
     let mut detected_char_id: Option<String> = None; // Track the 4-digit character ID
+    let mut has_wbp_galacta = false; // Forces the 4017 (Galacta) icon regardless of other detection
 
     for file in &mod_contents {
         let path = file
@@ -156,6 +157,12 @@ pub fn get_pak_characteristics_detailed(mod_contents: Vec<String>) -> ModCharact
         let filename = path.split('/').last().unwrap_or("");
         let filename_lower = filename.to_lowercase();
         let path_lower = path.to_lowercase();
+
+        // WBP_Galacta has no numeric hero ID in its path/filename for the
+        // regexes below to pick up, so it's special-cased directly by name.
+        if filename_lower.contains("wbp_galacta") {
+            has_wbp_galacta = true;
+        }
 
         // Check for specific asset types by filename pattern
         // Note: Internal paths may or may not have .uasset extension
@@ -289,6 +296,14 @@ pub fn get_pak_characteristics_detailed(mod_contents: Vec<String>) -> ModCharact
                 }
             }
         }
+    }
+
+    // Force the Galacta (4017) hero icon whenever a WBP_Galacta asset is present,
+    // overriding any other hero detected from the same mod.
+    if has_wbp_galacta {
+        hero_names.clear();
+        hero_names.insert("Galacta".to_string());
+        detected_char_id = Some("4017".to_string());
     }
 
     // Convert to sorted Vec for consistent ordering

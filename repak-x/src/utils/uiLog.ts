@@ -121,6 +121,13 @@ export const uiLog = {
  */
 function inferLevel(message: string): LogLevel {
   const lower = message.toLowerCase()
+
+  // "Summary: N succeeded, M failed" always contains the substring "failed",
+  // even when M is 0 — check the actual count before falling through to the
+  // generic substring checks below, or a fully successful run reads as an error.
+  const summaryMatch = /(\d+)\s+succeeded,\s*(\d+)\s+failed/.exec(lower)
+  if (summaryMatch) return Number(summaryMatch[2]) > 0 ? 'error' : 'success'
+
   if (lower.includes('✗') || lower.includes('error') || lower.includes('failed')) return 'error'
   if (lower.includes('warning') || lower.includes('warn')) return 'warn'
   if (lower.includes('✓') || lower.includes('success') || lower.includes('complete')) return 'success'

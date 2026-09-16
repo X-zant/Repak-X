@@ -89,6 +89,14 @@
   border-color: var(--text-secondary);
 }
 
+.copy-paths-btn.icon-only {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  font-size: 1.1rem;
+}
+
 .detail-item {
   display: flex;
   justify-content: space-between;

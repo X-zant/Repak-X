@@ -2221,6 +2221,15 @@ fn detect_hero_ids(files: &[String]) -> Vec<String> {
 
     let mut ids: Vec<String> = Vec::new();
     for file in files {
+        // WBP_Galacta has no numeric hero ID in its path/filename, so it's
+        // special-cased directly by name (mirrors utils.rs).
+        if file.to_lowercase().contains("wbp_galacta") {
+            if !ids.contains(&"4017".to_string()) {
+                ids.push("4017".to_string());
+            }
+            continue;
+        }
+
         let found = path_re
             .captures(file)
             .or_else(|| name_re.captures(file))
