@@ -89,6 +89,23 @@
     animation: tool-card-pulse 1.1s ease-in-out infinite;
 }
 
+/* Project Galacta's icon is flat artwork masked to the accent color, matching
+   the other tool icons instead of showing its own baked-in colors. */
+.pg-mask-icon {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    background-color: var(--accent-primary);
+    -webkit-mask-image: var(--pg-mask-url);
+    mask-image: var(--pg-mask-url);
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+}
+
 @keyframes tool-card-pulse {
 
     0%,

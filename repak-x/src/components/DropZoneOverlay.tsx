@@ -387,13 +387,17 @@ const DropZoneOverlay = ({
                 return;
             }
 
-            // Check if over organize zone (but not specific folder)
+            // Check if over organize zone (but not specific folder) - this is
+            // the card's own title/description/padding, not empty space
+            // outside it, so it should still quick-organize, just to the root
+            // folder rather than whichever one happened to be selected last.
             const organizeZone = element.closest('[data-dropzone="organize"]');
             if (organizeZone) {
                 setHoveredZone('organize');
-                // Keep current folder selection if any
-                if (selectedFolderId) {
-                    onQuickOrganizeDrop?.(selectedFolderId);
+                const fallbackFolderId = selectedFolderId ?? rootFolder?.id ?? null;
+                setSelectedFolderId(fallbackFolderId);
+                if (fallbackFolderId) {
+                    onQuickOrganizeDrop?.(fallbackFolderId);
                 } else {
                     onInstallDrop?.();
                 }
@@ -410,7 +414,7 @@ const DropZoneOverlay = ({
             unlistenDragOver.then(f => f());
             stopScrolling();
         };
-    }, [isVisible, selectedFolderId, onInstallDrop, onQuickOrganizeDrop, onNewFolderDrop]);
+    }, [isVisible, selectedFolderId, rootFolder, onInstallDrop, onQuickOrganizeDrop, onNewFolderDrop]);
 
     const handleNewFolder = async (e: React.MouseEvent) => {
         e.stopPropagation();

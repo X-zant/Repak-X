@@ -79,7 +79,7 @@ import OnboardingTour from './components/OnboardingTour'
 
 // Utility functions
 import { toTagArray } from './utils/tags'
-import { detectHeroes } from './utils/heroes'
+import { detectHeroes, PROJECT_GALACTA_HERO_ID } from './utils/heroes'
 import { formatFileSize, normalizeModBaseName } from './utils/format'
 import { getAdditionalCategories } from './utils/mods'
 
@@ -319,6 +319,8 @@ function App() {
   const [filterTag, setFilterTag] = useState('')
   const [filterType, setFilterType] = useState('')
   const [modDetails, setModDetails] = useState<Record<string, any>>({}) // { [path]: ModDetails }
+  // Project Galacta mod found directly in the base game's Paks folder (outside ~mods), if any
+  const [externalGalactaMod, setExternalGalactaMod] = useState<{ path: string; enabled: boolean } | null>(null)
   const [detailsLoading, setDetailsLoading] = useState(false)
   const [selectedCharacters, setSelectedCharacters] = useState<Set<string>>(new Set()) // values: character_name, '__generic', '__multi'
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set()) // category strings
@@ -381,6 +383,7 @@ function App() {
   const [promiseLoaderMessage, setPromiseLoaderMessage] = useState('Working...')
 
   const dropTargetFolderRef = useRef<string | null>(null)
+  const projectGalactaModRef = useRef<{ path: string; enabled?: boolean } | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const modsGridRef = useRef<HTMLDivElement | null>(null)
   const gameRunningRef = useRef(false)
@@ -550,10 +553,90 @@ function App() {
   // Global tooltips - replaces native browser tooltips with styled ones
   useGlobalTooltips();
 
+  // Shared by the drag-drop handler and the extension-install listener: if the
+  // dropped item is recognized as Project Galacta and Repak-X already knows
+  // where it's currently installed, replace it there directly instead of
+  // going through the normal folder-picking flow. Returns whether it handled
+  // the drop, so callers know to skip their own install path.
+  const tryInstallAsProjectGalactaUpdate = async (
+    paths: string[],
+    opts: { deleteArchiveOnSuccess?: boolean } = {}
+  ): Promise<boolean> => {
+    const existing = projectGalactaModRef.current
+    if (!existing || paths.length !== 1) return false
+
+    const entries = await invoke('inspect_archive_mods', { path: paths[0] }).catch(() => null) as any[] | null
+    const pgEntry = entries?.find(e => Array.isArray(e.hero_ids) && e.hero_ids.includes(PROJECT_GALACTA_HERO_ID))
+    if (!pgEntry) return false
+
+    // Forcing this exact stem is what makes the replacement land as the same
+    // file regardless of what name the new archive ships internally.
+    const newBaseName = (existing.path.split(/[\\/]/).pop() || '')
+      .replace(/\.(pak|bak_repak|pak_disabled)$/i, '')
+
+    setIsModsLoading(true)
+    setModLoadingProgress(-1)
+    invoke('discord_set_installing').catch(console.warn)
+
+    await alert.promise(
+      (async () => {
+        try {
+          await invoke('quick_organize_locked', {
+            paths,
+            existingModPath: existing.path,
+            newBaseName,
+            selections: [pgEntry.rel_path],
+            renames: { [pgEntry.rel_path]: newBaseName },
+            flatten: true
+          })
+
+          await loadMods()
+          await loadFolders()
+          setStatus('Project Galacta updated')
+
+          if (opts.deleteArchiveOnSuccess) {
+            await invoke('delete_source_archive', { path: paths[0] }).catch((cleanupErr) => {
+              console.warn('Failed to delete source archive:', cleanupErr)
+            })
+          }
+        } finally {
+          setIsModsLoading(false)
+          setModLoadingProgress(0)
+          invoke('discord_set_idle').catch(console.warn)
+        }
+      })(),
+      {
+        loading: {
+          title: 'Updating Project Galacta',
+          description: 'Installing to its current location...'
+        },
+        success: () => ({
+          title: 'Project Galacta Updated',
+          description: 'Replaced the existing install in place.'
+        }),
+        error: (err) => ({
+          title: 'Update Failed',
+          description: String(err)
+        })
+      }
+    )
+
+    return true
+  }
+
   // Unified file drop handler function
   const handleFileDrop = async (paths: string[]) => {
     if (!paths || paths.length === 0) return
     console.log('Dropped items:', paths)
+
+    // A recognized Project Galacta update always replaces the existing install
+    // in place, regardless of which folder (if any) it was dropped on, or how
+    // the drop would otherwise classify - checked first so it pre-empts every
+    // other branch below.
+    if (await tryInstallAsProjectGalactaUpdate(paths)) {
+      setDropTargetFolder(null)
+      return
+    }
 
     // Check if we should quick-organize to a folder (using ref for current value in closure)
     const targetFolder = dropTargetFolderRef.current
@@ -1355,10 +1438,16 @@ function App() {
     })
 
     // Listen for mods received from browser extension via repakx:// protocol
-    const unlistenExtensionMod = listen('extension-mod-received', (event: any) => {
+    const unlistenExtensionMod = listen('extension-mod-received', async (event: any) => {
       const filePath = event.payload
       console.log('Received mod from extension:', filePath)
-      setExtensionModPath(filePath)
+
+      // A recognized Project Galacta update skips the picker overlay entirely
+      // and replaces the existing install in place.
+      const handled = await tryInstallAsProjectGalactaUpdate([filePath], { deleteArchiveOnSuccess: true })
+      if (!handled) {
+        setExtensionModPath(filePath)
+      }
     })
 
     // Listen for extension mod errors
@@ -1724,6 +1813,13 @@ function App() {
       console.log('Loaded mods:', modList)
       setMods(modList)
       setStatus(`Loading ${modList.length} mod(s) details...`)
+
+      // Also check the base game's Paks folder for Project Galacta, in case it
+      // was dropped there instead of into ~mods. Fire-and-forget: it shouldn't
+      // block the mods list from loading.
+      invoke('find_project_galacta_in_paks')
+        .then((match: any) => setExternalGalactaMod(match || null))
+        .catch(() => setExternalGalactaMod(null))
 
       // After loading mods, refresh details for each (with progress tracking)
       await preloadModDetails(modList)
@@ -2780,8 +2876,24 @@ function App() {
     }
   }, [isFiltersResizing])
 
+  // The Project Galacta mod is identified by content (WBP_Galacta asset), not by
+  // name or path, so it stays correctly detected across enable/disable renames.
+  // If it isn't in ~mods, fall back to the external match from the base game's
+  // Paks folder (see refreshExternalGalactaMod).
+  const projectGalactaMod = mods.find(mod => {
+    const files = modDetails[mod.path]?.files
+    return Array.isArray(files) && files.some((f: string) => f.toLowerCase().includes('wbp_galacta'))
+  }) || externalGalactaMod
+
+  // Kept live for the drag-drop handler and extension listener, both captured
+  // once at mount and otherwise stuck reading a stale value.
+  projectGalactaModRef.current = projectGalactaMod
+
   // Compute base filtered mods (excluding folder filter)
   const baseFilteredMods = mods.filter(mod => {
+    // Project Galacta is managed from its own Tools panel toggle, not the mods list
+    if (projectGalactaMod && mod.path === projectGalactaMod.path) return false
+
     // Search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
@@ -3418,6 +3530,10 @@ function App() {
         <ToolsPanel
           onClose={() => setPanel('tools', false)}
           onOpenAssetExplorer={openAssetExplorerWindow}
+          projectGalactaMod={projectGalactaMod}
+          onToggleProjectGalacta={async () => {
+            if (projectGalactaMod) await handleToggleMod(projectGalactaMod.path)
+          }}
         />
       )}
 

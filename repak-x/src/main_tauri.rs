@@ -2263,9 +2263,6 @@ async fn quick_organize(
     state: State<'_, Arc<Mutex<AppState>>>,
     window: Window,
 ) -> Result<i32, String> {
-    use crate::install_mod::install_mod_logic::archives::{extract_7z, extract_rar, extract_zip};
-    use walkdir::WalkDir;
-
     let state_guard = state.lock().unwrap();
     let mod_directory = state_guard.game_path.clone();
     drop(state_guard);
@@ -2286,6 +2283,94 @@ async fn quick_organize(
             output_dir.display()
         );
     }
+
+    let location_label = if target_folder.is_empty() {
+        "~mods (root)".to_string()
+    } else {
+        target_folder.clone()
+    };
+
+    quick_organize_impl(paths, output_dir, location_label, selections, renames, flatten, &window)
+}
+
+/// Locks the destination to wherever `existing_mod_path` currently lives instead of a
+/// folder the user picks. Used when a dropped archive/pak is recognized as an update to a
+/// mod Repak-X already knows the location of (e.g. Project Galacta), including when that
+/// mod lives outside `~mods` entirely (the base game's `Paks` folder) - `quick_organize`
+/// can't reach that, since its output directory is always relative to `state.game_path`.
+///
+/// `new_base_name` is the exact stem (no extension) the caller wants the replacement to
+/// land as - normally the existing mod's own stem, so the file this replaces disappears
+/// via `quick_organize_impl`'s own clean-base-name cleanup regardless of what name the new
+/// archive happens to ship internally. Since that shared copy step has no notion of "the
+/// mod that used to be here", it always writes the result enabled; if the existing mod was
+/// disabled, this restores that state afterward (mirrors `update_mod`'s equivalent step).
+#[tauri::command]
+async fn quick_organize_locked(
+    paths: Vec<String>,
+    existing_mod_path: String,
+    new_base_name: String,
+    selections: Option<Vec<String>>,
+    renames: Option<std::collections::HashMap<String, String>>,
+    flatten: Option<bool>,
+    window: Window,
+) -> Result<i32, String> {
+    let existing = PathBuf::from(&existing_mod_path);
+    let output_dir = existing
+        .parent()
+        .ok_or_else(|| "Existing mod path has no parent directory".to_string())?
+        .to_path_buf();
+
+    let disabled_ext = match existing.extension().and_then(|s| s.to_str()) {
+        Some("bak_repak") => Some("bak_repak"),
+        Some("pak_disabled") => Some("pak_disabled"),
+        _ => None,
+    };
+
+    let location_label = format!("Project Galacta's current location ({})", output_dir.display());
+    let count = quick_organize_impl(
+        paths,
+        output_dir.clone(),
+        location_label,
+        selections,
+        renames,
+        flatten,
+        &window,
+    )?;
+
+    // The shared copy step above always installs enabled; restore the disabled state the
+    // replaced mod had, since nothing else here has a reason to flip it back off.
+    if let Some(ext) = disabled_ext {
+        let new_pak = output_dir.join(format!("{}.pak", new_base_name));
+        if new_pak.exists() {
+            let disabled_path = output_dir.join(format!("{}.{}", new_base_name, ext));
+            if let Err(e) = std::fs::rename(&new_pak, &disabled_path) {
+                warn!(
+                    "Failed to restore disabled state after locked update: {}",
+                    e
+                );
+            }
+        }
+    }
+
+    Ok(count)
+}
+
+/// Shared implementation behind `quick_organize` and `quick_organize_locked`: copies (and
+/// extracts, if archives) the given paths into `output_dir`, replacing any existing mod
+/// there whose clean base name matches first. `location_label` is only used for the
+/// `install_log` messages.
+fn quick_organize_impl(
+    paths: Vec<String>,
+    output_dir: PathBuf,
+    location_label: String,
+    selections: Option<Vec<String>>,
+    renames: Option<std::collections::HashMap<String, String>>,
+    flatten: Option<bool>,
+    window: &Window,
+) -> Result<i32, String> {
+    use crate::install_mod::install_mod_logic::archives::{extract_7z, extract_rar, extract_zip};
+    use walkdir::WalkDir;
 
     // Resolve the optional install options into their defaults.
     let flatten = flatten.unwrap_or(false);
@@ -2373,14 +2458,7 @@ async fn quick_organize(
     );
     let _ = window.emit(
         "install_log",
-        format!(
-            "[QuickOrganize] Copying to folder: {}",
-            if target_folder.is_empty() {
-                "~mods (root)".to_string()
-            } else {
-                target_folder.clone()
-            }
-        ),
+        format!("[QuickOrganize] Copying to folder: {}", location_label),
     );
 
     let mut copied_count = 0;
@@ -3773,6 +3851,37 @@ async fn copy_to_clipboard(text: String, window: Window) -> Result<(), String> {
     Ok(())
 }
 
+/// True when `a` and `b` are the same path except for letter case (e.g.
+/// "banners" vs "BANNERS"). Used to recognize a case-only rename, which
+/// `Path::exists()` can't distinguish from a genuine name collision on a
+/// case-insensitive filesystem (Windows, and macOS by default).
+fn is_case_only_rename(a: &Path, b: &Path) -> bool {
+    a != b && a.to_string_lossy().to_lowercase() == b.to_string_lossy().to_lowercase()
+}
+
+/// Renames `old` to `new`, transparently handling the case-only case.
+///
+/// On a case-insensitive filesystem, a direct rename between two names that
+/// differ only in letter case resolves to the same directory entry, so it can
+/// silently no-op or fail outright instead of actually updating the stored
+/// case. Bouncing through a uniquely-named temporary sibling first forces the
+/// OS to treat it as two genuinely different names.
+fn rename_path_case_safe(old: &Path, new: &Path) -> std::io::Result<()> {
+    if !is_case_only_rename(old, new) {
+        return std::fs::rename(old, new);
+    }
+
+    let parent = new.parent().unwrap_or_else(|| Path::new(""));
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let temp_path = parent.join(format!(".repakx_rename_tmp_{}", nanos));
+
+    std::fs::rename(old, &temp_path)?;
+    std::fs::rename(&temp_path, new)
+}
+
 #[tauri::command]
 async fn rename_mod(
     mod_path: String,
@@ -3862,7 +3971,7 @@ async fn rename_mod(
     };
     let new_path = parent.join(&new_file_name);
 
-    if new_path.exists() {
+    if new_path.exists() && !is_case_only_rename(&old_path_buf, &new_path) {
         let error_msg = format!("A file with name '{}' already exists", new_file_name);
         toast_events::emit_rename_failed(&window, &error_msg);
         return Err(error_msg);
@@ -3880,7 +3989,7 @@ async fn rename_mod(
             old_ucas.exists()
         );
         if old_ucas.exists() {
-            match std::fs::rename(&old_ucas, &new_ucas) {
+            match rename_path_case_safe(&old_ucas, &new_ucas) {
                 Ok(_) => info!("rename_mod: renamed ucas to {}", new_ucas.display()),
                 Err(e) => warn!("rename_mod: failed to rename ucas: {}", e),
             }
@@ -3895,7 +4004,7 @@ async fn rename_mod(
             old_utoc.exists()
         );
         if old_utoc.exists() {
-            match std::fs::rename(&old_utoc, &new_utoc) {
+            match rename_path_case_safe(&old_utoc, &new_utoc) {
                 Ok(_) => info!("rename_mod: renamed utoc to {}", new_utoc.display()),
                 Err(e) => warn!("rename_mod: failed to rename utoc: {}", e),
             }
@@ -3903,7 +4012,7 @@ async fn rename_mod(
     }
 
     // Rename the main file
-    if let Err(e) = std::fs::rename(&old_path_buf, &new_path) {
+    if let Err(e) = rename_path_case_safe(&old_path_buf, &new_path) {
         let error_msg = format!("Failed to rename file: {}", e);
         toast_events::emit_rename_failed(&window, &error_msg);
         return Err(error_msg);
@@ -4247,14 +4356,14 @@ async fn rename_folder(
 
     let new_path = game_path.join(&new_id);
 
-    if new_path.exists() {
+    if new_path.exists() && !is_case_only_rename(&old_path, &new_path) {
         let error_msg = format!("A folder named \"{}\" already exists", new_name);
         toast_events::emit_folder_rename_failed(&window, &error_msg);
         return Err(error_msg);
     }
 
     // Rename the physical directory
-    if let Err(e) = std::fs::rename(&old_path, &new_path) {
+    if let Err(e) = rename_path_case_safe(&old_path, &new_path) {
         let error_msg = format!("Failed to rename folder: {}", e);
         toast_events::emit_folder_rename_failed(&window, &error_msg);
         return Err(error_msg);
@@ -4534,6 +4643,95 @@ async fn toggle_mod(
     }
 
     Ok(!is_enabled)
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct ExternalModMatch {
+    path: String,
+    enabled: bool,
+}
+
+/// Looks for the Project Galacta mod directly inside the base game's `Paks`
+/// folder (the parent of `~mods`), for players who dropped it there instead of
+/// into the mods folder that `get_pak_files` normally scans.
+///
+/// Only checks top-level files whose name contains "projectgalacta" before
+/// opening anything - the retail game paks that also live in that folder are
+/// multi-gigabyte and irrelevant, and the loose "galacta" substring would also
+/// catch unrelated hero-specific mods, so the fuller name keeps false matches
+/// out. The `WBP_Galacta` asset check on the shortlisted candidate is what
+/// actually confirms it.
+#[tauri::command]
+async fn find_project_galacta_in_paks(
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<Option<ExternalModMatch>, String> {
+    let game_path = {
+        let state = state.lock().unwrap();
+        state.game_path.clone()
+    };
+
+    let Some(paks_dir) = game_path.parent().map(|p| p.to_path_buf()) else {
+        return Ok(None);
+    };
+
+    let Ok(entries) = std::fs::read_dir(&paks_dir) else {
+        return Ok(None);
+    };
+
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.is_dir() {
+            continue;
+        }
+
+        let ext = path.extension().and_then(|s| s.to_str());
+        if ext != Some("pak") && ext != Some("bak_repak") && ext != Some("pak_disabled") {
+            continue;
+        }
+
+        let stem_lower = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or_default()
+            .to_lowercase();
+        if !stem_lower.contains("projectgalacta") {
+            continue;
+        }
+
+        let utoc_path = path.with_extension("utoc");
+        let files: Option<Vec<String>> = if utoc_path.exists() {
+            use crate::utoc_utils::read_utoc;
+            let files: Vec<String> = read_utoc(&utoc_path)
+                .iter()
+                .map(|e| e.file_path.clone())
+                .collect();
+            if files.is_empty() {
+                None
+            } else {
+                Some(files)
+            }
+        } else {
+            uasset_toolkit::list_pak_files(
+                path.to_str().unwrap_or_default(),
+                Some(crate::install_mod::AES_KEY_HEX),
+            )
+            .ok()
+            .filter(|f| !f.is_empty())
+        };
+
+        let Some(files) = files else { continue };
+
+        let has_galacta_asset = files.iter().any(|f| f.to_lowercase().contains("wbp_galacta"));
+
+        if has_galacta_asset {
+            return Ok(Some(ExternalModMatch {
+                path: path.to_string_lossy().to_string(),
+                enabled: ext == Some("pak"),
+            }));
+        }
+    }
+
+    Ok(None)
 }
 
 #[tauri::command]
@@ -8427,6 +8625,8 @@ fn main() {
             add_tag_to_catalog,
             delete_tag_from_all_mods,
             toggle_mod,
+            find_project_galacta_in_paks,
+            quick_organize_locked,
             check_game_running,
             launch_game,
             skip_launcher_patch,

@@ -4,6 +4,9 @@
 
 import characterDataStatic from '../data/character_data.json';
 
+/** Hero id Repak-X assigns to Project Galacta (via its WBP_Galacta asset). */
+export const PROJECT_GALACTA_HERO_ID = '4017';
+
 /**
  * Detects hero names from a list of file paths
  * Uses regex patterns matching the backend logic for character IDs
@@ -22,7 +25,7 @@ export function detectHeroes(files: string[]): string[] {
         // WBP_Galacta has no numeric hero ID in its path/filename, so it's
         // special-cased directly by name (mirrors backend logic).
         if (file.toLowerCase().includes('wbp_galacta')) {
-            heroIds.add('4017');
+            heroIds.add(PROJECT_GALACTA_HERO_ID);
             return;
         }
 
@@ -72,7 +75,7 @@ export function detectHeroesWithData(files: string[], characterData: any[]): str
         // WBP_Galacta has no numeric hero ID in its path/filename, so it's
         // special-cased directly by name (mirrors backend logic).
         if (file.toLowerCase().includes('wbp_galacta')) {
-            heroIds.add('4017');
+            heroIds.add(PROJECT_GALACTA_HERO_ID);
             return;
         }
 

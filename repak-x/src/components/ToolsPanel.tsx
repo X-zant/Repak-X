@@ -12,8 +12,14 @@ import { VscListTree } from "react-icons/vsc";
 import { IconType } from 'react-icons';
 import Progress from './ui/Progress';
 import { uiLog } from '../utils/uiLog';
+import pgIconUrl from '../assets/tools/PG_icon.webp';
 import './SettingsPanel.css'; // Reuse the same styles
 import './ToolsPanel.css';
+
+/** Project Galacta's icon, tinted with the current theme accent color via CSS masking. */
+function ProjectGalactaIcon() {
+    return <span className="pg-mask-icon" style={{ '--pg-mask-url': `url(${pgIconUrl})` } as React.CSSProperties} />;
+}
 
 type RecompressProgress = {
     current: number;
@@ -24,6 +30,10 @@ type ToolsPanelProps = {
     onClose: () => void;
     /** Opens the Asset Explorer window; the panel closes itself first. */
     onOpenAssetExplorer?: () => void;
+    /** The installed mod detected to contain the Project Galacta hero asset, if any. */
+    projectGalactaMod?: { path: string; enabled?: boolean } | null;
+    /** Enables/disables the detected Project Galacta mod. */
+    onToggleProjectGalacta?: () => Promise<void>;
 };
 
 type StatusTone = 'on' | 'off' | 'unknown' | 'error';
@@ -43,7 +53,7 @@ type ToolCardConfig = {
     progress?: RecompressProgress;
 };
 
-export default function ToolsPanel({ onClose, onOpenAssetExplorer }: ToolsPanelProps) {
+export default function ToolsPanel({ onClose, onOpenAssetExplorer, projectGalactaMod, onToggleProjectGalacta }: ToolsPanelProps) {
     const [isUpdatingChars, setIsUpdatingChars] = useState(false);
     const [charUpdateStatus, setCharUpdateStatus] = useState('');
     const [isSkippingLauncher, setIsSkippingLauncher] = useState(false);
@@ -56,6 +66,8 @@ export default function ToolsPanel({ onClose, onOpenAssetExplorer }: ToolsPanelP
     const [recompressStatus, setRecompressStatus] = useState('');
     const [recompressResult, setRecompressResult] = useState<any | null>(null);
     const [recompressProgress, setRecompressProgress] = useState<RecompressProgress>({ current: 0, total: 0 });
+    const [isTogglingGalacta, setIsTogglingGalacta] = useState(false);
+    const [galactaStatusMsg, setGalactaStatusMsg] = useState('');
 
     // Check skip launcher status on mount
     useEffect(() => {
@@ -122,6 +134,16 @@ export default function ToolsPanel({ onClose, onOpenAssetExplorer }: ToolsPanelP
             return () => clearTimeout(timer);
         }
     }, [recompressStatus, isRecompressing]);
+
+    // Clear Project Galacta status msg after 5 seconds
+    useEffect(() => {
+        if (galactaStatusMsg) {
+            const timer = setTimeout(() => {
+                setGalactaStatusMsg('');
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [galactaStatusMsg]);
 
     // Listen for recompress progress events
     useEffect(() => {
@@ -217,6 +239,22 @@ export default function ToolsPanel({ onClose, onOpenAssetExplorer }: ToolsPanelP
         }
     };
 
+    const handleToggleProjectGalacta = async () => {
+        if (!projectGalactaMod || !onToggleProjectGalacta) return;
+        setIsTogglingGalacta(true);
+        setGalactaStatusMsg('');
+        try {
+            const wasEnabled = projectGalactaMod.enabled;
+            await onToggleProjectGalacta();
+            uiLog.info('Tools', `Project Galacta ${wasEnabled ? 'disabled' : 'enabled'}`);
+        } catch (error) {
+            uiLog.error('Tools', `Could not toggle Project Galacta: ${error}`);
+            setGalactaStatusMsg(`Error: ${error}`);
+        } finally {
+            setIsTogglingGalacta(false);
+        }
+    };
+
     const tools: ToolCardConfig[] = [
         ...(onOpenAssetExplorer ? [{
             id: 'asset-explorer',
@@ -240,6 +278,21 @@ export default function ToolsPanel({ onClose, onOpenAssetExplorer }: ToolsPanelP
                     ? { tone: 'off', label: 'Disabled' }
                     : { tone: 'unknown', label: 'Not Installed' },
             message: sigBypasserStatusMsg
+        },
+        {
+            id: 'project-galacta',
+            icon: ProjectGalactaIcon,
+            title: 'Project Galacta',
+            description: 'Toggles the Project Galacta mod.',
+            onClick: handleToggleProjectGalacta,
+            busy: isTogglingGalacta,
+            disabled: isTogglingGalacta || !projectGalactaMod,
+            state: !projectGalactaMod
+                ? { tone: 'unknown', label: 'Not Found' }
+                : projectGalactaMod.enabled
+                    ? { tone: 'on', label: 'Enabled' }
+                    : { tone: 'off', label: 'Disabled' },
+            message: galactaStatusMsg
         },
         {
             id: 'skip-launcher',

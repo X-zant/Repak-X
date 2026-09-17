@@ -15,7 +15,7 @@
   gap: 1rem;
 }
 
-.details-header h2 {
+.details-header h2.mod-title {
   font-size: 1rem;
   font-weight: 500;
   margin: 0;
@@ -24,6 +24,31 @@
   text-overflow: ellipsis;
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* While sliding, the ellipsis would just clip the reveal mid-character */
+.details-header h2.mod-title.is-scrolling {
+  text-overflow: clip;
+}
+
+.details-header h2.mod-title .mod-title-text {
+  display: inline-block;
+  white-space: nowrap;
+  transition: transform 0.3s ease;
+}
+
+.details-header h2.mod-title.is-scrolling .mod-title-text {
+  animation: mod-title-reveal var(--mod-title-scroll-duration, 2s) ease-in-out forwards;
+}
+
+@keyframes mod-title-reveal {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(var(--mod-title-scroll-distance, 0px));
+  }
 }
 
 .close-btn {
