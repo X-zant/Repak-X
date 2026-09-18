@@ -187,6 +187,38 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
     }
   }
 
+  if (folder && folder.is_root) {
+    // The root folder can't be renamed, moved, or deleted, so it only gets
+    // the two actions that make sense for it.
+    return (
+      <div ref={menuRef} className="context-menu" style={{ top: adjustedPos.y, left: adjustedPos.x }} onClick={(e) => e.stopPropagation()}>
+        <div className="context-menu-header">{folder.name}</div>
+        <div className="context-menu-item" onClick={async () => {
+          try {
+            // Root's id is its own folder name, which gamePath already ends with -
+            // so gamePath itself is the root's path.
+            await invoke('open_in_explorer', { path: gamePath || folder.id });
+          } catch (e) {
+            console.error('Failed to open folder in explorer:', e);
+          }
+          onClose();
+        }}>
+          Open in Explorer
+        </div>
+        <div className="context-menu-item" onClick={async () => {
+          onClose();
+          try {
+            await invoke('copy_to_clipboard', { text: gamePath || folder.id });
+          } catch (e) {
+            console.error('Failed to copy folder path:', e);
+          }
+        }}>
+          Copy Path
+        </div>
+      </div>
+    )
+  }
+
   if (folder) {
     // Compute the candidate destination parents:
     //   - the folder itself

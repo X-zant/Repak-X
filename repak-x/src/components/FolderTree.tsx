@@ -243,6 +243,12 @@ const FolderTree = ({ folders, selectedFolderId, onSelect, onDelete, getCount, h
                     <div
                         className={`node-content ${selectedFolderId === rootFolder.id ? 'selected' : ''}`}
                         onClick={() => onSelect(rootFolder.id)}
+                        onContextMenu={(e) => {
+                            if (!onContextMenu) return;
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onContextMenu(e, { id: rootFolder.id, name: rootFolder.name, is_root: true });
+                        }}
                     >
                         <span
                             className="node-toggle-icon"

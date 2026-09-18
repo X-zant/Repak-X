@@ -2267,8 +2267,21 @@ async fn quick_organize(
     let mod_directory = state_guard.game_path.clone();
     drop(state_guard);
 
+    // The frontend reports the root folder using its actual on-disk name
+    // (e.g. "~mods", but a manually-chosen mods folder can be named anything),
+    // not always the literal string "~mods" - comparing against that literal
+    // alone let a custom-named root install into a same-named subfolder of
+    // itself instead of the root.
+    let root_folder_name = mod_directory
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("~mods");
+
     // Determine the output directory
-    let output_dir = if target_folder.is_empty() || target_folder == "~mods" {
+    let output_dir = if target_folder.is_empty()
+        || target_folder == "~mods"
+        || target_folder == root_folder_name
+    {
         mod_directory.clone()
     } else {
         mod_directory.join(&target_folder)
@@ -2284,8 +2297,11 @@ async fn quick_organize(
         );
     }
 
-    let location_label = if target_folder.is_empty() {
-        "~mods (root)".to_string()
+    let location_label = if target_folder.is_empty()
+        || target_folder == "~mods"
+        || target_folder == root_folder_name
+    {
+        format!("{} (root)", root_folder_name)
     } else {
         target_folder.clone()
     };

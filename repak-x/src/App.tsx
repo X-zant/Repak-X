@@ -566,7 +566,13 @@ function App() {
     if (!existing || paths.length !== 1) return false
 
     const entries = await invoke('inspect_archive_mods', { path: paths[0] }).catch(() => null) as any[] | null
-    const pgEntry = entries?.find(e => Array.isArray(e.hero_ids) && e.hero_ids.includes(PROJECT_GALACTA_HERO_ID))
+    // Only a built (IoStore) bundle is safe to auto-replace in place. A raw
+    // legacy pak straight from UE - not yet repacked - must go through the
+    // normal install panel like any other new mod, so it can be processed
+    // instead of overwriting the existing IoStore install with the wrong format.
+    const pgEntry = entries?.find(e =>
+      e.is_iostore && Array.isArray(e.hero_ids) && e.hero_ids.includes(PROJECT_GALACTA_HERO_ID)
+    )
     if (!pgEntry) return false
 
     // Forcing this exact stem is what makes the replacement land as the same
