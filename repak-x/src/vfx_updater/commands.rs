@@ -453,6 +453,12 @@ fn usmap_dir() -> PathBuf {
     vfx_app_dir().join("usmap")
 }
 
+/// Whether the selected USMAP exists, so the UI can hold the pipeline until it does.
+#[tauri::command]
+pub fn vfx_usmap_exists(path: String) -> bool {
+    !path.trim().is_empty() && Path::new(&path).is_file()
+}
+
 fn is_in_managed_dir(path: &str) -> bool {
     let managed = usmap_dir();
     if Path::new(path).starts_with(&managed) {

@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { invoke } from "@tauri-apps/api/core";
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion";
 import { usePipeline } from "./hooks/usePipeline";
+import { updatedModOutputBase } from "./lib/outputName";
 import { PIPELINE_STEPS } from "./types";
 import type { VfxSettings } from "./types";
 import { ShineBorder } from "../../components/ui/ShineBorder";
@@ -139,6 +140,7 @@ interface LogEntry {
 
 export default function VfxUpdaterPanel() {
   const [usmapPath, setUsmapPath] = useState<string | null>(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [gamePaksPath, setGamePaksPath] = useState<string | null>(null);
   const [modPath, setModPath] = useState<string | null>(null);
   const outputPath = null; // Forces processing to default to ~mods 
@@ -275,6 +277,8 @@ export default function VfxUpdaterPanel() {
         if (loadedFolders) setFolders(loadedFolders);
       } catch (e) {
         console.error("[VFX] Failed to load settings:", e);
+      } finally {
+        setSettingsLoaded(true);
       }
     };
 
@@ -288,6 +292,11 @@ export default function VfxUpdaterPanel() {
 
   const [isFetchingUsmap, setIsFetchingUsmap] = useState(false);
   const didRunInitialUsmapCheckRef = useRef(false);
+  const [initialUsmapCheckDone, setInitialUsmapCheckDone] = useState(false);
+  // Bumped after every depot check: a Fetch can restore a missing file at the same
+  // path, which would not otherwise re-run the existence check.
+  const [usmapRevision, setUsmapRevision] = useState(0);
+  const [usmapCheck, setUsmapCheck] = useState<{ path: string; exists: boolean } | null>(null);
 
   // Run the rivals-depot USMAP check. When `force` is true, the user clicked
   // the Fetch button — show extra UI feedback and ALWAYS apply the latest
@@ -338,24 +347,40 @@ export default function VfxUpdaterPanel() {
       return null;
     } finally {
       if (force) setIsFetchingUsmap(false);
+      setUsmapRevision((r) => r + 1);
     }
   }, [addLog, usmapPath]);
 
   // Auto-pull latest USMAP from rivals-depot on mount.
   // This runs in the background — uses GitHub ETag so the typical case is a
-  // cheap 304 Not Modified.
+  // cheap 304 Not Modified. The pipeline stays locked until it settles, so a run
+  // can't start on a USMAP that is about to be replaced.
   useEffect(() => {
     if (didRunInitialUsmapCheckRef.current) return;
     didRunInitialUsmapCheckRef.current = true;
 
-    let cancelled = false;
     (async () => {
-      const _ = await runUsmapCheck(false);
-      if (cancelled) return;
+      await runUsmapCheck(false);
+      setInitialUsmapCheckDone(true);
     })();
-    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Check the selected USMAP is actually on disk, whenever it changes or is re-fetched.
+  useEffect(() => {
+    if (!usmapPath) {
+      setUsmapCheck(null);
+      return;
+    }
+
+    let stale = false;
+    invoke<boolean>("vfx_usmap_exists", { path: usmapPath })
+      .catch(() => false)
+      .then((exists) => {
+        if (!stale) setUsmapCheck({ path: usmapPath, exists });
+      });
+    return () => { stale = true; };
+  }, [usmapPath, usmapRevision]);
 
   // Make logs auto-scroll
   useEffect(() => {
@@ -369,6 +394,19 @@ export default function VfxUpdaterPanel() {
     outputPath, // Forces save to gamePaksPath/~mods/ 
     addLog,
   });
+
+  // Why UPDATE MOD is locked, or null once the pipeline has everything it needs.
+  const startLockReason: string | null = (() => {
+    if (isProcessing) return "Pipeline is running...";
+    if (!settingsLoaded) return "Loading settings...";
+    if (!initialUsmapCheckDone || isFetchingUsmap) return "Checking for the latest USMAP...";
+    if (!usmapPath) return "Select a USMAP file";
+    if (usmapCheck?.path !== usmapPath) return "Checking USMAP...";
+    if (!usmapCheck.exists) return "USMAP file not found - Fetch or Browse for one";
+    if (!gamePaksPath) return "Game path is not set";
+    if (!modPath) return "Select a mod to update";
+    return null;
+  })();
 
   const handleFilePick = async (setter: (path: string | null) => void, filters?: { name: string; extensions: string[] }[], saveAsUsmap = false) => {
     try {
@@ -391,6 +429,7 @@ export default function VfxUpdaterPanel() {
   };
 
   const handleStart = async () => {
+    if (startLockReason) return;
     setViewMode('progress');
     await runPipeline();
   };
@@ -421,14 +460,7 @@ export default function VfxUpdaterPanel() {
   const handleSaveOutput = async () => {
     if (!modPath || !gamePaksPath) return;
 
-    const modBaseName = modPath
-      .split(/[\\/]/)
-      .pop()!
-      .replace(".utoc", "")
-      .replace(/_\d+_P$/, "")
-      .replace(/_P$/, "");
-
-    const pakPath = `${gamePaksPath}/~mods/${modBaseName}_UPDATED_9999999_P.pak`;
+    const pakPath = `${updatedModOutputBase(modPath, null, gamePaksPath)}.pak`;
 
     if (selectedFolderId) {
       const selectedFolder = folders.find((f: FolderRecord) => f.id === selectedFolderId);
@@ -522,7 +554,7 @@ export default function VfxUpdaterPanel() {
     return Math.round(clampedRatio * 100);
   });
 
-  const isStartDisabled = !usmapPath || !gamePaksPath || !modPath;
+  const isStartDisabled = startLockReason !== null;
 
   return (
     <div className="vfx-panel">
@@ -577,6 +609,7 @@ export default function VfxUpdaterPanel() {
                 className="vfx-start-btn"
                 onClick={handleStart}
                 disabled={isStartDisabled}
+                title={startLockReason ?? undefined}
                 onMouseMove={(e) => {
                   const rect = e.currentTarget.getBoundingClientRect();
                   e.currentTarget.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
@@ -586,6 +619,11 @@ export default function VfxUpdaterPanel() {
                 <span>UPDATE MOD</span>
               </button>
             </ShineBorder>
+            {startLockReason && (
+              <p className={`vfx-start-status${usmapCheck && !usmapCheck.exists ? " is-error" : ""}`}>
+                {startLockReason}
+              </p>
+            )}
           </motion.div>
         )}
 

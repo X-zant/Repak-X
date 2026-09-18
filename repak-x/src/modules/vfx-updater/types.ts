@@ -7,6 +7,30 @@ export interface ColorParam {
   path: (string | number)[];
   rgba: { R: number; G: number; B: number; A: number };
   relativePath: string;
+  /** Material vector parameter: ported by identity as a whole entry rather than by path. */
+  materialParam?: MaterialParam;
+  /** The color property the path points into, re-checked on the target before writing. */
+  anchor?: ColorAnchor;
+}
+
+/** A material parameter's ParameterInfo: name, association and layer index. */
+export interface MaterialParamId {
+  name: string;
+  association?: string;
+  index?: number;
+}
+
+/** One entry of a material instance's Scalar/VectorParameterValues, as read from the mod. */
+export interface MaterialParam {
+  id: MaterialParamId;
+  /** The whole UAssetAPI struct entry, carrying its own unversioned header and zero flags. */
+  entry: any;
+}
+
+export interface ColorAnchor {
+  path: (string | number)[];
+  name: string;
+  structType: string;
 }
 
 export interface VfxPipelineProgress {

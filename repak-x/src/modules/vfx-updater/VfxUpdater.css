@@ -192,6 +192,17 @@
   opacity: 1;
 }
 
+.vfx-start-status {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-secondary, #999999);
+}
+
+.vfx-start-status.is-error {
+  color: var(--danger, #ff5c5c);
+}
+
 /* Progress Screen */
 .vfx-progress-screen {
   display: flex;

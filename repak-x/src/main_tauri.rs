@@ -8722,6 +8722,7 @@ fn main() {
             vfx_updater::vfx_get_settings,
             vfx_updater::vfx_save_settings,
             vfx_updater::vfx_check_usmap_update,
+            vfx_updater::vfx_usmap_exists,
             hero_assets::sync_hero_images,
             hero_assets::get_hero_image_ids,
             hero_assets::get_hero_image,

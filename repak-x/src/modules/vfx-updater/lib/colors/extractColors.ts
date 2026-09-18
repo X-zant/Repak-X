@@ -2,6 +2,7 @@
 
 import type { ColorParam } from "../../types";
 import { paramMatchesFilter } from "../filter";
+import { readParamId } from "../materialParams";
 
 export function getColorPropertyNames(): string[] {
   return [
@@ -108,7 +109,15 @@ export function findColorsRecursive(
       path: resolvedPath,
     });
 
-    allParams.push({ id, fileName, paramName, path: resolvedPath, rgba: sanitizedRgba, relativePath });
+    allParams.push({
+      id,
+      fileName,
+      paramName,
+      path: resolvedPath,
+      rgba: sanitizedRgba,
+      relativePath,
+      anchor: { path: currentPath, name: currentObject.Name, structType: currentObject.StructType },
+    });
   } else {
     if (Array.isArray(currentObject)) {
       currentObject.forEach((item: any, index: number) => {
@@ -144,9 +153,8 @@ export function parseJsonAndExtractColors(
         if (!paramMatchesFilter(paramName)) return;
 
         const paramValueObj = param?.Value?.find((p: any) => p.Name === "ParameterValue");
-        const linearColor = paramValueObj?.Value?.find(
-          (p: any) => p.Name === "ParameterValue"
-        )?.Value;
+        const colorIndex = paramValueObj?.Value?.findIndex?.((p: any) => p.Name === "ParameterValue") ?? -1;
+        const linearColor = colorIndex >= 0 ? paramValueObj.Value[colorIndex]?.Value : undefined;
 
         if (linearColor) {
           const id = `${relativePath}-${paramName}-${paramIndex}`;
@@ -155,8 +163,10 @@ export function parseJsonAndExtractColors(
             json.Exports[0].Data.findIndex((p: any) => p.Name === "VectorParameterValues"),
             "Value", paramIndex, "Value",
             param.Value.findIndex((p: any) => p.Name === "ParameterValue"),
-            "Value", 0, "Value",
+            "Value", colorIndex, "Value",
           ];
+          const paramId = readParamId(paramInfo);
+          const materialParam = paramId ? { id: paramId, entry: param } : undefined;
 
           const sanitizedRgba = {
             ...linearColor,
@@ -167,7 +177,7 @@ export function parseJsonAndExtractColors(
           };
 
           console.debug("[VFX] Extracted VectorParameter color", { paramName, path, rgba: sanitizedRgba });
-          allParams.push({ id, fileName, paramName, path, rgba: sanitizedRgba, relativePath });
+          allParams.push({ id, fileName, paramName, path, rgba: sanitizedRgba, relativePath, materialParam });
         }
       }
     });

@@ -10,6 +10,15 @@ export const DEFAULT_FILTER: FilterDictionary = {
   excludes: ["Offset", "uv", "ColorMaskChannel", "MaskColor_Enemy"],
 };
 
+/** True when `paramName` hits an exclude keyword (and must never be ported). */
+export function paramIsExcluded(
+  paramName: string,
+  filterDictionary: FilterDictionary = DEFAULT_FILTER
+): boolean {
+  const lowerName = paramName.toLowerCase();
+  return filterDictionary.excludes.some((keyword) => lowerName.includes(keyword.toLowerCase()));
+}
+
 export function paramMatchesFilter(
   paramName: string,
   filterDictionary: FilterDictionary = DEFAULT_FILTER

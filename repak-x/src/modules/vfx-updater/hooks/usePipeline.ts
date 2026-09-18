@@ -4,9 +4,12 @@
 import { useState, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { ColorParam, VfxPipelineProgress, VfxTempDirectories, PipelineStep, PIPELINE_STEPS } from "../types";
+import type { ColorParam, MaterialParam, VfxPipelineProgress, VfxTempDirectories, PipelineStep, PIPELINE_STEPS } from "../types";
 import { parseJsonAndExtractColors } from "../lib/colors/extractColors";
 import { applyColorToJson } from "../lib/colors/applyColors";
+import { updatedModOutputBase } from "../lib/outputName";
+import { portMaterialParam, readMaterialParams, type MaterialParamList } from "../lib/materialParams";
+import { paramIsExcluded } from "../lib/filter";
 
 interface StepStatus {
   message?: string;
@@ -22,6 +25,23 @@ interface PipelineState {
   vanillaAssets: string[];
   vanillaJsonFiles: string[];
   outputUassets: string[];
+}
+
+/** Comparison key for a JSON path relative to its step dir: forward slashes, no extension, lowercased. */
+function toAssetKey(relativePath: string): string {
+  return relativePath
+    .replace(/\\/g, "/")
+    .replace(/^\/+/, "")
+    .replace(/\.json$/i, "")
+    .toLowerCase();
+}
+
+/** `path` relative to `baseDir`, tolerant of mixed slash styles between the two. */
+function relativeTo(path: string, baseDir: string): string {
+  const norm = path.replace(/\\/g, "/");
+  const base = baseDir.replace(/\\/g, "/").replace(/\/+$/, "");
+  const rel = norm.toLowerCase().startsWith(base.toLowerCase()) ? norm.substring(base.length) : norm;
+  return rel.replace(/^\/+/, "");
 }
 
 // Parallel processing utility
@@ -205,16 +225,7 @@ export function usePipeline({
         addLog("Step 8: Creating IOStore mod bundle.", "info");
         setStepStatus({ message: "Packing IOStore..." });
 
-        const modBaseName = modPath
-          .split(/[\\/]/)
-          .pop()!
-          .replace(".utoc", "")
-          .replace(/_\d+_P$/, "")
-          .replace(/_P$/, "");
-
-        const outputBase = outputPath
-          ? `${outputPath}/${modBaseName}_UPDATED_9999999_P`
-          : `${gamePaksPath}/~mods/${modBaseName}_UPDATED_9999999_P`;
+        const outputBase = updatedModOutputBase(modPath, outputPath, gamePaksPath);
 
         const finalBundle = await invoke<string>("vfx_pack_to_iostore", {
           usmapPath,
@@ -265,10 +276,14 @@ export function usePipeline({
       // ===== STEP 3: Parse Colors =====
       checkCancel();
       setCurrentStep(3);
-      addLog("Step 3: Extracting color parameters.", "info");
-      setStepStatus({ message: "Parsing colors from mod assets..." });
+      addLog("Step 3: Extracting color and scalar parameters.", "info");
+      setStepStatus({ message: "Parsing parameters from mod assets..." });
 
       const allColors: ColorParam[] = [];
+      // Material parameters are ported wholesale, keyed by asset like the colors. The color
+      // name filter only drives the color list; here only the exclude list applies, so
+      // edits to non-color vectors (e.g. *_Param) carry over too.
+      const materialParamsByAsset = new Map<string, { list: MaterialParamList; param: MaterialParam }[]>();
       const parseConcurrency = 6;
 
       const parseResults = await parallelMapWithLimit(modJsonFiles, parseConcurrency, async (jsonPath: string) => {
@@ -277,13 +292,21 @@ export function usePipeline({
           const jsonContent = await invoke<string>("vfx_read_json_file", { path: jsonPath });
           const json = JSON.parse(jsonContent);
           const fileName = jsonPath.split(/[\\/]/).pop()!;
-          const relativePath = jsonPath.replace(tempDirs.modJson, "").replace(/^[\\/]/, "");
+          const relativePath = relativeTo(jsonPath, tempDirs.modJson);
           const localColors: ColorParam[] = [];
           parseJsonAndExtractColors(json, fileName, relativePath, localColors);
-          return { colors: localColors, warning: null as string | null };
+          const lists: MaterialParamList[] = ["ScalarParameterValues", "VectorParameterValues"];
+          const params = lists.flatMap((list) =>
+            readMaterialParams(json, list)
+              .filter((param) => !paramIsExcluded(param.id.name))
+              .map((param) => ({ list, param }))
+          );
+          return { colors: localColors, params, relativePath, warning: null as string | null };
         } catch (e) {
           return {
             colors: [] as ColorParam[],
+            params: [] as { list: MaterialParamList; param: MaterialParam }[],
+            relativePath: "",
             warning: `Could not parse ${jsonPath.split(/[\\/]/).pop()}: ${e}`,
           };
         }
@@ -297,14 +320,18 @@ export function usePipeline({
         if (result.colors.length > 0) {
           allColors.push(...result.colors);
         }
+        if (result.params.length > 0) {
+          materialParamsByAsset.set(toAssetKey(result.relativePath), result.params);
+        }
       }
 
+      const materialParamCount = [...materialParamsByAsset.values()].reduce((sum, list) => sum + list.length, 0);
       setExtractedColors(allColors);
-      addLog(`✓ Extracted ${allColors.length} color parameters`, "success");
-      console.debug("[VFX] Step 3 complete", { colors: allColors.length });
+      addLog(`✓ Extracted ${allColors.length} colors and ${materialParamCount} material parameters`, "success");
+      console.debug("[VFX] Step 3 complete", { colors: allColors.length, materialParams: materialParamCount });
 
-      if (allColors.length === 0) {
-        addLog("No color parameters found - pipeline will create passthrough mod", "warning");
+      if (allColors.length === 0 && materialParamCount === 0) {
+        addLog("No parameters found - pipeline will create passthrough mod", "warning");
       }
 
       // ===== STEP 4: Extract Vanilla Assets =====
@@ -346,8 +373,8 @@ export function usePipeline({
       // ===== STEP 6: Apply Colors =====
       checkCancel();
       setCurrentStep(6);
-      addLog("Step 6: Applying mod colors to vanilla assets.", "info");
-      setStepStatus({ message: "Applying colors..." });
+      addLog("Step 6: Applying mod parameters to vanilla assets.", "info");
+      setStepStatus({ message: "Applying parameters..." });
 
       let appliedCount = 0;
       const applyConcurrency = 6;
@@ -357,16 +384,26 @@ export function usePipeline({
         try {
           const jsonContent = await invoke<string>("vfx_read_json_file", { path: jsonPath });
           let json = JSON.parse(jsonContent);
-          const relativePath = jsonPath.replace(tempDirs.vanillaJson, "").replace(/^[\\/]/, "");
+          const relativePath = relativeTo(jsonPath, tempDirs.vanillaJson);
 
-          const matchingColors = allColors.filter((c) =>
-            c.relativePath === relativePath ||
-            c.relativePath.replace(".json", "") === relativePath.replace(".json", "") ||
-            c.relativePath.split(/[\\/]/).pop() === relativePath.split(/[\\/]/).pop()
+          // Exact asset path only: a Lobby/ variant shares its file name with the in-game one.
+          // Material vector colors are covered by the wholesale port below.
+          const assetKey = toAssetKey(relativePath);
+          const matchingColors = allColors.filter(
+            (c) => toAssetKey(c.relativePath) === assetKey && !c.materialParam
           );
 
           let appliedToFile = 0;
+          let paramsChanged = 0;
           const fileWarnings: string[] = [];
+
+          for (const { list, param } of materialParamsByAsset.get(assetKey) ?? []) {
+            const result = portMaterialParam(json, list, param);
+            if (result === "changed") paramsChanged++;
+            else if (result === "missing") {
+              fileWarnings.push(`Could not port ${param.id.name}: not in the vanilla material`);
+            }
+          }
 
           if (matchingColors.length > 0) {
             console.debug("[VFX] Applying colors to", relativePath, matchingColors.length);
@@ -383,24 +420,25 @@ export function usePipeline({
                 fileWarnings.push(`Error applying ${color.paramName}: ${e}`);
               }
             }
-
-            if (appliedToFile > 0) {
-              // Write to edited_json directory
-              const editedPath = jsonPath.replace(tempDirs.vanillaJson, tempDirs.editedJson);
-              await invoke("vfx_write_json_file", {
-                path: editedPath,
-                content: JSON.stringify(json, null, 2)
-              });
-            }
           }
 
-          return { appliedToFile, fileWarnings };
+          if (appliedToFile > 0 || paramsChanged > 0) {
+            // Write to edited_json directory
+            const editedPath = `${tempDirs.editedJson}/${relativePath}`;
+            await invoke("vfx_write_json_file", {
+              path: editedPath,
+              content: JSON.stringify(json, null, 2)
+            });
+          }
+
+          return { appliedToFile, paramsChanged, fileWarnings };
         } catch (e) {
-          return { appliedToFile: 0, fileWarnings: [`Failed to process: ${jsonPath}`] };
+          return { appliedToFile: 0, paramsChanged: 0, fileWarnings: [`Failed to process: ${jsonPath}`] };
         }
       });
 
       appliedCount = applyResults.reduce((sum, r) => sum + r.appliedToFile, 0);
+      const paramsChanged = applyResults.reduce((sum, r) => sum + r.paramsChanged, 0);
       for (const result of applyResults) {
         if (result.fileWarnings.length > 0) {
           result.fileWarnings.forEach(w => addLog(`Warning: ${w}`, "warning"));
@@ -408,8 +446,8 @@ export function usePipeline({
         }
       }
 
-      addLog(`✓ Applied ${appliedCount} color values`, "success");
-      console.debug("[VFX] Step 6 complete", { appliedCount });
+      addLog(`✓ Ported ${paramsChanged} changed material parameters, applied ${appliedCount} other color values`, "success");
+      console.debug("[VFX] Step 6 complete", { appliedCount, paramsChanged });
 
       // ===== STEP 7: JSON → UAssets =====
       checkCancel();
@@ -433,16 +471,7 @@ export function usePipeline({
       addLog("Step 8: Creating IOStore mod bundle.", "info");
       setStepStatus({ message: "Packing updated mod..." });
 
-      const modBaseName = modPath
-        .split(/[\\/]/)
-        .pop()!
-        .replace(".utoc", "")
-        .replace(/_\d+_P$/, "")
-        .replace(/_P$/, "");
-
-      const outputBase = outputPath
-        ? `${outputPath}/${modBaseName}_UPDATED_9999999_P`
-        : `${gamePaksPath}/~mods/${modBaseName}_UPDATED_9999999_P`;
+      const outputBase = updatedModOutputBase(modPath, outputPath, gamePaksPath);
 
       const finalBundle = await invoke<string>("vfx_pack_to_iostore", {
         usmapPath,
