@@ -38,7 +38,7 @@
 }
 
 .details-header h2.mod-title.is-scrolling .mod-title-text {
-  animation: mod-title-reveal var(--mod-title-scroll-duration, 2s) ease-in-out forwards;
+  animation: mod-title-reveal var(--reveal-duration, 2s) ease-in-out forwards;
 }
 
 @keyframes mod-title-reveal {
@@ -47,7 +47,7 @@
   }
 
   100% {
-    transform: translateX(var(--mod-title-scroll-distance, 0px));
+    transform: translateX(var(--reveal-distance, 0px));
   }
 }
 

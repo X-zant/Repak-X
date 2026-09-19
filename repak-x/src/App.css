@@ -159,6 +159,8 @@ body {
 }
 
 .launch-button-content .blink-icon {
+  display: flex;
+  align-items: center;
   font-size: 1rem;
 }
 

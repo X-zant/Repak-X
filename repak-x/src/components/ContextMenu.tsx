@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { IoMdWarning } from "react-icons/io"
+import { IoLayersSharp } from "react-icons/io5"
 import './ContextMenu.css'
 
 type ModRecord = {
@@ -391,7 +391,7 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
       <div className="context-menu-separator" />
 
       <div className="context-menu-item" onClick={() => { if (onCheckConflicts) onCheckConflicts(); onClose(); }}>
-        Check Conflicts <IoMdWarning className="warning-icon-small" style={{ fill: 'var(--accent-primary)' }} />
+        Check Conflicts <IoLayersSharp className="warning-icon-small" style={{ fill: 'var(--accent-primary)' }} />
       </div>
 
       <div className="context-menu-item" onClick={() => { if (onUpdateMod) onUpdateMod(); onClose(); }}>

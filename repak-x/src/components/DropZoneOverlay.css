@@ -260,7 +260,7 @@
     border: 1px solid color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 70%);
     border-radius: 8px;
     font-size: 0.8rem;
-    color: var(--accent-primary, #4a9eff);
+    color: var(--text-primary);
     text-align: center;
     flex-shrink: 0;
 }
@@ -301,5 +301,87 @@
 
     .zone-icon {
         font-size: 3rem;
+    }
+}
+
+/* --- Animations (gated by Settings > Enable animations) --- */
+
+/* Registered so the angle can be animated */
+@property --dz-angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+}
+
+@keyframes dropzone-breathe {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 100%);
+        border-color: color-mix(in srgb, var(--accent-primary, #4a9eff), var(--panel-border) 65%);
+    }
+
+    50% {
+        box-shadow: 0 0 36px color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 80%);
+        border-color: color-mix(in srgb, var(--accent-primary, #4a9eff), var(--panel-border) 20%);
+    }
+}
+
+@keyframes dropzone-icon-float {
+
+    0%,
+    100% {
+        translate: 0 0;
+    }
+
+    50% {
+        translate: 0 -8px;
+    }
+}
+
+@keyframes dropzone-border-spin {
+    to {
+        --dz-angle: 360deg;
+    }
+}
+
+/* Idle: breathing glow, alternating between cards */
+:root:not([data-animations="off"]) .dropzone-card {
+    animation: dropzone-breathe 2.8s ease-in-out infinite;
+}
+
+:root:not([data-animations="off"]) .dropzone-card.organize-zone {
+    animation-delay: -1.4s;
+}
+
+:root:not([data-animations="off"]) .dropzone-card .zone-icon {
+    animation: dropzone-icon-float 3s ease-in-out infinite;
+}
+
+:root:not([data-animations="off"]) .dropzone-card.organize-zone .zone-icon {
+    animation-delay: -1.5s;
+}
+
+/* Hovered zone: highlight circles the border */
+:root:not([data-animations="off"]) .dropzone-card.active {
+    border-style: solid;
+    border-color: transparent;
+    background:
+        linear-gradient(var(--bg-lighter), var(--bg-lighter)) padding-box,
+        conic-gradient(from var(--dz-angle),
+            var(--accent-primary, #4a9eff),
+            color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 85%) 25%,
+            var(--accent-primary, #4a9eff) 50%,
+            color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 85%) 75%,
+            var(--accent-primary, #4a9eff)) border-box;
+    animation: dropzone-border-spin 7.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    :root:not([data-animations="off"]) .dropzone-card,
+    :root:not([data-animations="off"]) .dropzone-card.active,
+    :root:not([data-animations="off"]) .dropzone-card .zone-icon {
+        animation: none;
     }
 }

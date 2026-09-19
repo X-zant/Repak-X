@@ -27,6 +27,7 @@ import {
 } from '@mui/icons-material'
 import { RiDeleteBin2Fill } from 'react-icons/ri'
 import { MdDriveFileMoveOutline } from "react-icons/md"
+import { IoLayersSharp } from "react-icons/io5"
 import { FaTag, FaToolbox, FaSort } from "react-icons/fa6"
 import { IoMdWifi, IoIosSettings, IoMdWarning } from "react-icons/io"
 import { VscListTree } from "react-icons/vsc"
@@ -240,6 +241,7 @@ type AppSettings = {
   showSubfolderMods: boolean
   bypassGameRunningLock: boolean
   launcherType: 'steam' | 'epic'
+  enableAnimations: boolean
 }
 
 function App() {
@@ -258,6 +260,11 @@ function App() {
   const [holdToDelete, setHoldToDelete] = useState(true);
   const [bypassGameRunningLock, setBypassGameRunningLock] = useState(false);
   const [launcherType, setLauncherType] = useState<'steam' | 'epic'>('steam');
+  const [enableAnimations, setEnableAnimations] = useState(true);
+  // CSS gates animations on [data-animations="off"]
+  useEffect(() => {
+    document.documentElement.setAttribute('data-animations', enableAnimations ? 'on' : 'off');
+  }, [enableAnimations]);
   const [theme, setTheme] = useState('dark');
   const [accentColor, setAccentColor] = useState('#4a9eff');
   const [sortBy, setSortBy] = useState<'name' | 'modified'>('name');
@@ -319,6 +326,13 @@ function App() {
   const [filterTag, setFilterTag] = useState('')
   const [filterType, setFilterType] = useState('')
   const [modDetails, setModDetails] = useState<Record<string, any>>({}) // { [path]: ModDetails }
+  // Latest details for callbacks with stale closures (e.g. the file watcher's loadMods)
+  const modDetailsRef = useRef(modDetails)
+  modDetailsRef.current = modDetails
+  const commitModDetails = (next: Record<string, any>) => {
+    modDetailsRef.current = next
+    setModDetails(next)
+  }
   // Project Galacta mod found directly in the base game's Paks folder (outside ~mods), if any
   const [externalGalactaMod, setExternalGalactaMod] = useState<{ path: string; enabled: boolean } | null>(null)
   const [detailsLoading, setDetailsLoading] = useState(false)
@@ -1040,6 +1054,8 @@ function App() {
       setSelectedCharacters(new Set())
       setSelectedCategories(new Set())
       setFilterTag('')
+      // Scroll even if this mod is already selected
+      lastRevealedModRef.current = null
       setSelectedMod(target)
       if (!isRightPanelOpen) {
         setLeftPanelWidth(lastPanelWidth > 60 ? lastPanelWidth : 70)
@@ -1085,9 +1101,11 @@ function App() {
   // themselves, and the list is briefly out of step with the selection while they do.
   useEffect(() => {
     if (isModsLoading || !selectedMod) return
-    if (!mods.some(m => m.path === selectedMod.path)) {
-      setSelectedMod(null)
-    }
+    if (mods.some(m => m.path === selectedMod.path)) return
+    // A toggle renames the file; follow it instead of dropping the panel
+    const stemOf = (p: string) => p.replace(/\.(pak|bak_repak|pak_disabled)$/i, '')
+    const toggled = mods.find(m => stemOf(m.path) === stemOf(selectedMod.path))
+    setSelectedMod(toggled ?? null)
   }, [mods, selectedMod, isModsLoading])
 
   // Bulk Delete Handlers
@@ -1856,14 +1874,32 @@ function App() {
 
     try {
       setDetailsLoading(true)
-      const existing = modDetails
+      const existing = modDetailsRef.current
+
+      // A toggle renames .pak <-> .bak_repak; reuse the old path's details
+      // instead of refetching so the hero doesn't flicker
+      const stemOf = (p: string) => p.replace(/\.(pak|bak_repak|pak_disabled)$/i, '')
+      const currentPaths = new Set(modList.map(m => m.path))
+      const orphanedByStem = new Map<string, any>()
+      for (const [p, d] of Object.entries(existing)) {
+        if (!currentPaths.has(p)) orphanedByStem.set(stemOf(p), d)
+      }
+      const carried: Record<string, any> = {}
+      for (const m of modList) {
+        if (existing[m.path]) continue
+        const d = orphanedByStem.get(stemOf(m.path))
+        if (d) carried[m.path] = d
+      }
+      const base = Object.keys(carried).length > 0 ? { ...existing, ...carried } : existing
+      if (base !== existing) commitModDetails(base)
+
       const pathsToFetch = modList
         .map(m => m.path)
-        .filter(p => !existing[p])
+        .filter(p => !base[p])
 
       if (pathsToFetch.length === 0) {
         // Already have details; recompute filters source lists
-        recomputeFilterSources(modList, modDetails)
+        recomputeFilterSources(modList, base)
         setModLoadingProgress(100)
         return
       }
@@ -1882,14 +1918,14 @@ function App() {
         })
       )
 
-      const newMap = { ...existing }
+      const newMap = { ...modDetailsRef.current }
       results.forEach((res, idx) => {
         const path = pathsToFetch[idx]
         if (res.status === 'fulfilled' && res.value) {
           newMap[path] = res.value
         }
       })
-      setModDetails(newMap)
+      commitModDetails(newMap)
       recomputeFilterSources(modList, newMap)
     } catch (e) {
       console.error('Failed to preload mod details:', e)
@@ -3115,14 +3151,27 @@ function App() {
   // navigation, and reveals from the Asset Explorer window. Depends on
   // filteredMods because a reveal clears the filters first, and the card only
   // exists once that re-render has landed.
+  // filteredMods changes every render, so only scroll once per selection (the
+  // key ignores the toggle rename)
+  const lastRevealedModRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!selectedMod) return
+    if (!selectedMod) {
+      lastRevealedModRef.current = null
+      return
+    }
     const grid = modsGridRef.current
     if (!grid) return
 
+    const revealKey = selectedMod.path.replace(/\.(pak|bak_repak|pak_disabled)$/i, '')
+    if (lastRevealedModRef.current === revealKey) return
+
     const escaped = selectedMod.path.replace(/["\\]/g, '\\$&')
     const card = grid.querySelector<HTMLElement>(`[data-mod-path="${escaped}"]`)
-    card?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    // Not rendered yet (reveal cleared the filters): retry next render
+    if (!card) return
+
+    lastRevealedModRef.current = revealKey
+    card.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [selectedMod, filteredMods])
 
   // Group mods by folder
@@ -3283,6 +3332,7 @@ function App() {
     const newShowSubfolderMods = overrides.showSubfolderMods !== undefined ? overrides.showSubfolderMods : showSubfolderMods;
     const newBypassGameRunningLock = overrides.bypassGameRunningLock !== undefined ? overrides.bypassGameRunningLock : bypassGameRunningLock;
     const newLauncherType = overrides.launcherType !== undefined ? overrides.launcherType : launcherType;
+    const newEnableAnimations = overrides.enableAnimations !== undefined ? overrides.enableAnimations : enableAnimations;
 
     // 2. Map newAccentColor from hex to the preset name if it is a hex value
     const accentName = Object.keys(ACCENT_COLORS_MAP).find(key => ACCENT_COLORS_MAP[key] === newAccentColor) || newAccentColor;
@@ -3305,6 +3355,7 @@ function App() {
       showSubfolderMods: newShowSubfolderMods,
       bypassGameRunningLock: newBypassGameRunningLock,
       launcherType: newLauncherType,
+      enableAnimations: newEnableAnimations,
     };
 
     // 4. Save to backend
@@ -3341,6 +3392,7 @@ function App() {
     if (overrides.showSubfolderMods !== undefined) setShowSubfolderMods(newShowSubfolderMods);
     if (overrides.bypassGameRunningLock !== undefined) setBypassGameRunningLock(newBypassGameRunningLock);
     if (overrides.launcherType !== undefined) setLauncherType(newLauncherType);
+    if (overrides.enableAnimations !== undefined) setEnableAnimations(newEnableAnimations);
 
     // 6. Handle side effects (DRP connection, theme, etc.)
     if (newEnableDrp && !enableDrp) {
@@ -3416,6 +3468,7 @@ function App() {
         setBypassGameRunningLock(settings.bypassGameRunningLock);
         setEnableDrp(settings.enableDrp);
         if (settings.launcherType) setLauncherType(settings.launcherType);
+        setEnableAnimations(settings.enableAnimations !== false);
 
         // 5. Run auto update check if enabled
         // Applying the settings above is idempotent, so it is safe under a
@@ -3498,13 +3551,14 @@ function App() {
           clashes={clashes}
           mods={mods}
           onSetPriority={handleSetPriority}
+          onToggleMod={stableToggleMod}
           onClose={() => setPanel('clash', false)}
         />
       )}
 
       {panels.settings && (
         <SettingsPanel
-          settings={{ hideSuffix, autoOpenDetails, showHeroIcons, showHeroBg, showModType, showExperimental, enableDrp, parallelProcessing, autoCheckUpdates, holdToDelete, showSubfolderMods, bypassGameRunningLock, launcherType }}
+          settings={{ hideSuffix, autoOpenDetails, showHeroIcons, showHeroBg, showModType, showExperimental, enableDrp, parallelProcessing, autoCheckUpdates, holdToDelete, showSubfolderMods, bypassGameRunningLock, launcherType, enableAnimations }}
           onSave={handleSaveSettings}
           onClose={() => setPanel('settings', false)}
           theme={theme}
@@ -3754,7 +3808,7 @@ function App() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.5 }}
                 >
-                  <span className="blink-icon">⚠️</span> Game Running
+                  <span className="blink-icon"><IoMdWarning /></span> Game Running
                 </motion.span>
               ) : launchSuccess ? (
                 <motion.span
@@ -3894,7 +3948,7 @@ function App() {
 
         {!gamePath && (
           <div className="config-warning">
-            ⚠️ Game path not configured. <button onClick={() => setPanel('settings', true)} className="btn-link-warning">Configure in Settings</button>
+            <IoMdWarning size={18} style={{ flexShrink: 0 }} /> Game path not configured. <button onClick={() => setPanel('settings', true)} className="btn-link-warning">Configure in Settings</button>
           </div>
         )}
 
@@ -4055,7 +4109,7 @@ function App() {
                   </button>
                   <div className="divider-vertical" />
                   <button onClick={handleCheckClashes} className="btn-ghost btn-check-conflicts" title="Check for conflicts">
-                    <IoMdWarning className="warning-icon" style={{ color: 'var(--accent-primary)', width: '18px', height: '18px' }} />
+                    <IoLayersSharp className="warning-icon" style={{ color: 'var(--accent-primary)', width: '18px', height: '18px' }} />
                     <span className="btn-label">Check Conflicts</span>
                   </button>
                   <div className="divider-vertical" />
@@ -4243,6 +4297,7 @@ function App() {
                 gridRef={modsGridRef}
                 gameRunning={gameRunning && !bypassGameRunningLock}
                 holdToDelete={holdToDelete}
+                enableAnimations={enableAnimations}
                 onRenameBlocked={stableRenameBlocked}
                 onDeleteBlocked={stableDeleteBlocked}
               />

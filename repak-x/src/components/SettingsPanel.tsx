@@ -56,6 +56,7 @@ type SettingsPayload = {
   showSubfolderMods: boolean;
   bypassGameRunningLock: boolean;
   launcherType: 'steam' | 'epic';
+  enableAnimations: boolean;
 };
 
 type SettingsPanelProps = {
@@ -96,12 +97,9 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
   const [bypassGameRunningLock, setBypassGameRunningLock] = useState(settings.bypassGameRunningLock || false);
   const [enableDrp, setEnableDrp] = useState(settings.enableDrp !== false);
   const [launcherType, setLauncherType] = useState<'steam' | 'epic'>(settings.launcherType || 'steam');
+  const [enableAnimations, setEnableAnimations] = useState(settings.enableAnimations !== false);
   const [showRatMode, setShowRatMode] = useState(false);
 
-  // Shown only when the startup check disagreed with what was on disk, which is
-  // the exact state that reopens the changelog every launch. This uses the
-  // snapshot taken BEFORE the marker was rewritten -- comparing the live value
-  // here would always look correct, since startup has already corrected it.
   const changelogStateMismatch = useMemo(() => {
     if (!changelogMarker) return null;
     const { lastSeen, current, recorded } = changelogMarker;
@@ -132,7 +130,8 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
       holdToDelete,
       showSubfolderMods,
       bypassGameRunningLock,
-      launcherType
+      launcherType,
+      enableAnimations
     });
     alert.success('Settings Saved', 'Your preferences have been updated.');
     onClose();
@@ -399,6 +398,14 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
                         onChange={(checked: boolean) => setShowHeroBg(checked)}
                       >
                         <span>Show hero background on mod cards</span>
+                      </Checkbox>
+                    </div>
+                    <div className="setting-item">
+                      <Checkbox
+                        checked={enableAnimations}
+                        onChange={(checked: boolean) => setEnableAnimations(checked)}
+                      >
+                        <span>Enable extra animations</span>
                       </Checkbox>
                     </div>
                     <div className="setting-item">

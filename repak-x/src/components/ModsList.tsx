@@ -9,6 +9,7 @@ import NumberInput from './ui/NumberInput'
 import { toTagArray } from '../utils/tags'
 import { formatFileSize } from '../utils/format'
 import { detectHeroesWithData } from '../utils/heroes'
+import { useHoverTextReveal } from '../hooks/useHoverTextReveal'
 import { FALLBACK_HERO_ID, resolveHeroImage, useHeroImages } from '../utils/heroImages'
 import './ModsList.css'
 import './ModDetailsPanel.css'
@@ -69,6 +70,7 @@ type ModItemProps = {
     onDeleteBlocked?: () => void
     modDetails?: ModDetailsRecord
     holdToDelete?: boolean
+    animationsEnabled?: boolean
 }
 
 type ModsListProps = {
@@ -98,6 +100,7 @@ type ModsListProps = {
     onRenameBlocked?: () => void
     onDeleteBlocked?: () => void
     holdToDelete?: boolean
+    enableAnimations?: boolean
 }
 
 // Get hero image by character ID, with name-based fallback.
@@ -135,12 +138,16 @@ const ModItem = memo(function ModItem({
     onRenameBlocked,
     onDeleteBlocked,
     modDetails,
-    holdToDelete = true
+    holdToDelete = true,
+    animationsEnabled = true
 }: ModItemProps) {
     // Portraits load asynchronously from the synced cache; subscribing here
     // repaints the row when they arrive, which `memo` would otherwise skip.
     useHeroImages()
     const [isDeleteHolding, setIsDeleteHolding] = useState(false)
+    const [isLeaving, setIsLeaving] = useState(false)
+    const nameReveal = useHoverTextReveal(animationsEnabled)
+    const leaveTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
     const [isRenaming, setIsRenaming] = useState(false)
     const [renameValue, setRenameValue] = useState('')
     const holdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -168,6 +175,22 @@ const ModItem = memo(function ModItem({
     const visibleTags = tags.slice(0, MAX_VISIBLE_TAGS)
     const hiddenTags = tags.slice(MAX_VISIBLE_TAGS)
 
+    useEffect(() => () => leaveTimersRef.current.forEach(clearTimeout), [])
+
+    // Delay matches mod-card-leave in ModsList.css
+    const requestDelete = (permanent: boolean) => {
+        if (!animationsEnabled) {
+            handleDeleteMod(mod.path, permanent)
+            return
+        }
+        setIsLeaving(true)
+        leaveTimersRef.current.push(
+            setTimeout(() => handleDeleteMod(mod.path, permanent), 260),
+            // Restore the card if the delete failed
+            setTimeout(() => setIsLeaving(false), 2500)
+        )
+    }
+
     const startDeleteHold = (e: React.MouseEvent<HTMLButtonElement> | React.TouchEvent<HTMLButtonElement>) => {
         e.stopPropagation()
         if (gameRunning) {
@@ -176,12 +199,12 @@ const ModItem = memo(function ModItem({
         }
         const shouldPermanentDelete = 'shiftKey' in e && Boolean(e.shiftKey)
         if (!holdToDelete) {
-            handleDeleteMod(mod.path, shouldPermanentDelete)
+            requestDelete(shouldPermanentDelete)
             return
         }
         setIsDeleteHolding(true)
         holdTimeoutRef.current = setTimeout(() => {
-            handleDeleteMod(mod.path, shouldPermanentDelete)
+            requestDelete(shouldPermanentDelete)
             setIsDeleteHolding(false)
         }, 2000)
     }
@@ -264,7 +287,7 @@ const ModItem = memo(function ModItem({
 
     return (
         <div
-            className={`mod-card ${isChecked ? 'selected' : ''} ${isViewing ? 'viewing' : ''} ${heroImage && showHeroBg ? 'has-hero-bg' : ''}`}
+            className={`mod-card ${isChecked ? 'selected' : ''} ${isViewing ? 'viewing' : ''} ${heroImage && showHeroBg ? 'has-hero-bg' : ''} ${mod.enabled === false ? 'mod-disabled' : ''} ${isLeaving ? 'mod-leaving' : ''}`}
             // Lets the app scroll a specific mod into view without threading a
             // ref per card (see the reveal effect in App.tsx).
             data-mod-path={mod.path}
@@ -356,11 +379,19 @@ const ModItem = memo(function ModItem({
                             }
                         }}
                         onDoubleClick={startRename}
+                        onMouseEnter={nameReveal.onMouseEnter}
+                        onMouseLeave={nameReveal.onMouseLeave}
                         title={`${rawName} (double-click to rename)`}
                     >
-                        <span className="mod-name-text">
-                            {cleanName}
-                            {shouldShowSuffix && <span className="mod-name-suffix">{suffix}</span>}
+                        <span
+                            ref={nameReveal.containerRef}
+                            className={`mod-name-text ${nameReveal.revealStyle ? 'is-scrolling' : ''}`}
+                            style={nameReveal.revealStyle}
+                        >
+                            <span ref={nameReveal.innerRef} className="mod-name-inner">
+                                {cleanName}
+                                {shouldShowSuffix && <span className="mod-name-suffix">{suffix}</span>}
+                            </span>
                         </span>
                     </button>
                 )}
@@ -531,7 +562,8 @@ export default function ModsList({
     gameRunning,
     onRenameBlocked,
     onDeleteBlocked,
-    holdToDelete
+    holdToDelete,
+    enableAnimations = true
 }: ModsListProps) {
     return (
         <div className="mods-list-wrapper">
@@ -550,7 +582,8 @@ export default function ModsList({
                         const details = modDetails?.[mod.path]
                         return (
                             <ModItem
-                                key={mod.path}
+                                // Stem key: a toggle renames the file but must not remount the card
+                                key={mod.path.replace(/\.(pak|bak_repak|pak_disabled)$/i, '')}
                                 mod={mod}
                                 isViewing={selectedMod?.path === mod.path}
                                 isChecked={selectedMods.has(mod.path)}
@@ -576,6 +609,7 @@ export default function ModsList({
                                 onRenameBlocked={onRenameBlocked}
                                 onDeleteBlocked={onDeleteBlocked}
                                 holdToDelete={holdToDelete}
+                                animationsEnabled={enableAnimations}
                                 modDetails={details}
                             />
                         )

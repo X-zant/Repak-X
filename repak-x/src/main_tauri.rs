@@ -155,6 +155,8 @@ struct AppState {
     enable_drp: bool,
     #[serde(default = "default_launcher_type")]
     launcher_type: String,
+    #[serde(default = "default_true")]
+    enable_animations: bool,
 
     custom_tag_catalog: Vec<String>,
     #[serde(default)]
@@ -187,6 +189,7 @@ impl Default for AppState {
             bypass_game_running_lock: false,
             enable_drp: default_true(),
             launcher_type: default_launcher_type(),
+            enable_animations: default_true(),
             custom_tag_catalog: Vec::new(),
             mod_tags: std::collections::HashMap::new(),
             last_known_crash_folder: None,
@@ -301,6 +304,8 @@ struct AppSettings {
     bypass_game_running_lock: bool,
     enable_drp: bool,
     launcher_type: String,
+    #[serde(default = "default_true")]
+    enable_animations: bool,
 }
 
 #[tauri::command]
@@ -334,6 +339,7 @@ async fn get_app_settings(state: State<'_, Arc<Mutex<AppState>>>) -> Result<AppS
         bypass_game_running_lock: state.bypass_game_running_lock,
         enable_drp: state.enable_drp,
         launcher_type: state.launcher_type.clone(),
+        enable_animations: state.enable_animations,
     })
 }
 
@@ -363,6 +369,7 @@ async fn save_app_settings(
     state.bypass_game_running_lock = settings.bypass_game_running_lock;
     state.enable_drp = settings.enable_drp;
     state.launcher_type = settings.launcher_type;
+    state.enable_animations = settings.enable_animations;
 
     // Apply DRP immediately. The connect handshake can block for a while
     // (see discord_presence::connect), and this command's caller awaits the
@@ -4652,10 +4659,12 @@ async fn toggle_mod(
         return Err(error_msg);
     }
 
-    // Invalidate cache for old path
+    // Carry cached details over to the new path (rename keeps the mtime)
     {
         let mut state_guard = state.lock().unwrap();
-        state_guard.mod_details_cache.remove(&path);
+        if let Some(entry) = state_guard.mod_details_cache.remove(&path) {
+            state_guard.mod_details_cache.insert(new_path, entry);
+        }
     }
 
     Ok(!is_enabled)

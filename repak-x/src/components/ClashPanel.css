@@ -126,6 +126,21 @@
     align-items: center;
 }
 
+.clash-toggle-wrapper {
+    display: flex;
+    align-items: center;
+}
+
+.clash-mod-row.disabled .clash-mod-name {
+    opacity: 0.55;
+}
+
+.clash-mod-row.disabled .clash-mod-badge {
+    background: var(--bg-lighter);
+    color: var(--text-secondary);
+    border-color: var(--panel-border);
+}
+
 .clash-footer {
     padding: 1rem 1.5rem;
     border-top: 1px solid var(--panel-border);

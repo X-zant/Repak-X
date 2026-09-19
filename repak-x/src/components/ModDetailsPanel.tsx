@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
-import type { CSSProperties } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useHoverTextReveal } from '../hooks/useHoverTextReveal'
 import { invoke } from '@tauri-apps/api/core'
 import { Tooltip } from '@mui/material'
 import { FaTag, FaExchangeAlt } from "react-icons/fa"
@@ -139,47 +139,11 @@ export default function ModDetailsPanel({ mod, initialDetails, onClose, characte
     return Array.from(badges)
   }, [details])
 
-  // Truncated mod names slide to reveal the rest on a sustained hover, rather
-  // than immediately, so a passing cursor doesn't set it off.
-  const titleContainerRef = useRef<HTMLHeadingElement | null>(null)
-  const titleTextRef = useRef<HTMLSpanElement | null>(null)
-  const titleHoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [titleScroll, setTitleScroll] = useState<{ distance: number; duration: number } | null>(null)
-
-  const clearTitleHoverTimer = () => {
-    if (titleHoverTimerRef.current) {
-      clearTimeout(titleHoverTimerRef.current)
-      titleHoverTimerRef.current = null
-    }
-  }
-
-  const handleTitleMouseEnter = () => {
-    clearTitleHoverTimer()
-    titleHoverTimerRef.current = setTimeout(() => {
-      const container = titleContainerRef.current
-      const text = titleTextRef.current
-      if (!container || !text) return
-
-      const overflow = text.offsetWidth - container.clientWidth
-      if (overflow > 2) {
-        setTitleScroll({
-          distance: overflow,
-          duration: Math.min(6, Math.max(1.2, overflow / 60))
-        })
-      }
-    }, 500)
-  }
-
-  const handleTitleMouseLeave = () => {
-    clearTitleHoverTimer()
-    setTitleScroll(null)
-  }
+  const titleReveal = useHoverTextReveal<HTMLHeadingElement, HTMLSpanElement>()
 
   // Reset if the selected mod changes while the timer/animation is active
   useEffect(() => {
-    clearTitleHoverTimer()
-    setTitleScroll(null)
-    return clearTitleHoverTimer
+    titleReveal.reset()
   }, [mod?.path])
 
   if (!mod) return null
@@ -193,19 +157,13 @@ export default function ModDetailsPanel({ mod, initialDetails, onClose, characte
     <div className="details-panel">
       <div className="details-header">
         <h2
-          className={`mod-title ${titleScroll ? 'is-scrolling' : ''}`}
-          ref={titleContainerRef}
-          onMouseEnter={handleTitleMouseEnter}
-          onMouseLeave={handleTitleMouseLeave}
+          className={`mod-title ${titleReveal.revealStyle ? 'is-scrolling' : ''}`}
+          ref={titleReveal.containerRef}
+          style={titleReveal.revealStyle}
+          onMouseEnter={titleReveal.onMouseEnter}
+          onMouseLeave={titleReveal.onMouseLeave}
         >
-          <span
-            className="mod-title-text"
-            ref={titleTextRef}
-            style={titleScroll ? {
-              '--mod-title-scroll-distance': `-${titleScroll.distance}px`,
-              '--mod-title-scroll-duration': `${titleScroll.duration}s`
-            } as CSSProperties : undefined}
-          >
+          <span className="mod-title-text" ref={titleReveal.innerRef}>
             {cleanName}
           </span>
         </h2>

@@ -255,15 +255,168 @@
     height: 200%;
     background-size: cover;
     background-position: center;
-    filter: blur(60px) saturate(1.5);
-    opacity: 0.35;
+    filter: blur(50px) saturate(1.8) brightness(1);
+    opacity: 0.5;
     pointer-events: none;
     z-index: 0;
+}
+
+/* Hover: blurred hero icon background lava lamp effect */
+@keyframes mod-card-bg-drift {
+
+    0%,
+    100% {
+        transform: translate(0, 0) rotate(0deg) scale(1.02);
+    }
+
+    33% {
+        transform: translate(5%, -4%) rotate(7deg) scale(1.12);
+    }
+
+    66% {
+        transform: translate(-5%, 4%) rotate(-6deg) scale(1.06);
+    }
+}
+
+@keyframes mod-card-bubble {
+
+    0%,
+    100% {
+        transform: translate(0, 0) scale(1);
+        border-radius: 60% 40% 55% 45% / 50% 60% 40% 50%;
+    }
+
+    25% {
+        transform: translate(35%, -25%) scale(1.25);
+        border-radius: 45% 55% 40% 60% / 60% 40% 55% 45%;
+    }
+
+    50% {
+        transform: translate(15%, 30%) scale(0.85);
+        border-radius: 55% 45% 60% 40% / 40% 55% 45% 60%;
+    }
+
+    75% {
+        transform: translate(-30%, 10%) scale(1.15);
+        border-radius: 40% 60% 45% 55% / 55% 45% 60% 40%;
+    }
+}
+
+:root:not([data-animations="off"]) .mod-card.has-hero-bg .mod-card-hero-bg {
+    animation: mod-card-bg-drift 7s ease-in-out infinite paused;
+}
+
+:root:not([data-animations="off"]) .mod-card.has-hero-bg .mod-card-hero-bg::before,
+:root:not([data-animations="off"]) .mod-card.has-hero-bg .mod-card-hero-bg::after {
+    content: '';
+    position: absolute;
+    background-image: inherit;
+    background-size: cover;
+    background-position: center;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    animation: mod-card-bubble 9s ease-in-out infinite paused;
+}
+
+:root:not([data-animations="off"]) .mod-card.has-hero-bg .mod-card-hero-bg::before {
+    left: 22%;
+    top: 22%;
+    width: 45%;
+    height: 55%;
+}
+
+:root:not([data-animations="off"]) .mod-card.has-hero-bg .mod-card-hero-bg::after {
+    left: 42%;
+    top: 30%;
+    width: 38%;
+    height: 48%;
+    animation-duration: 11s;
+    animation-direction: reverse;
+    animation-delay: -4s;
+}
+
+:root:not([data-animations="off"]) .mod-card.has-hero-bg:not(.mod-disabled):hover .mod-card-hero-bg,
+:root:not([data-animations="off"]) .mod-card.has-hero-bg:not(.mod-disabled):hover .mod-card-hero-bg::before,
+:root:not([data-animations="off"]) .mod-card.has-hero-bg:not(.mod-disabled):hover .mod-card-hero-bg::after {
+    animation-play-state: running;
+}
+
+:root:not([data-animations="off"]) .mod-card.has-hero-bg:not(.mod-disabled):hover .mod-card-hero-bg::before,
+:root:not([data-animations="off"]) .mod-card.has-hero-bg:not(.mod-disabled):hover .mod-card-hero-bg::after {
+    opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    :root:not([data-animations="off"]) .mod-card.has-hero-bg .mod-card-hero-bg,
+    :root:not([data-animations="off"]) .mod-card.has-hero-bg .mod-card-hero-bg::before,
+    :root:not([data-animations="off"]) .mod-card.has-hero-bg .mod-card-hero-bg::after {
+        animation: none;
+    }
+}
+
+/* Disabled mods: black & white hero bg (always on; only the fade is animated) */
+.mod-card.mod-disabled .mod-card-hero-bg {
+    filter: blur(50px) saturate(0) brightness(0.9);
+}
+
+:root:not([data-animations="off"]) .mod-card-hero-bg {
+    transition: filter 0.6s ease;
 }
 
 .mod-card.has-hero-bg>*:not(.mod-card-hero-bg) {
     position: relative;
     z-index: 1;
+}
+
+/* List enter: staggered fade/rise on mount. `backwards` fill so the final
+   transform doesn't block the hover lift. */
+@keyframes mod-card-enter {
+    from { opacity: 0; transform: translateY(12px) scale(0.98); }
+    to   { opacity: 1; transform: none; }
+}
+
+:root:not([data-animations="off"]) .mod-list-grid .mod-card {
+    animation: mod-card-enter 0.32s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+}
+
+:root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(2) { animation-delay: 30ms; }
+:root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(3) { animation-delay: 60ms; }
+:root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(4) { animation-delay: 90ms; }
+:root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(5) { animation-delay: 120ms; }
+:root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(6) { animation-delay: 150ms; }
+:root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(7) { animation-delay: 180ms; }
+:root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(8) { animation-delay: 210ms; }
+:root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(9) { animation-delay: 240ms; }
+:root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(10) { animation-delay: 270ms; }
+:root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(11) { animation-delay: 300ms; }
+:root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(12) { animation-delay: 330ms; }
+:root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(n+13) { animation-delay: 360ms; }
+:root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(n+25) { animation: none; }
+
+/* Exit: played before delete (duration matches requestDelete in ModsList.tsx) */
+@keyframes mod-card-leave {
+    to {
+        opacity: 0;
+        transform: translateX(28px) scale(0.96);
+        max-height: 0;
+        min-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        border-width: 0;
+    }
+}
+
+:root:not([data-animations="off"]) .mod-list-grid .mod-card.mod-leaving {
+    animation: mod-card-leave 0.26s ease-in forwards;
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root:not([data-animations="off"]) .mod-list-grid .mod-card,
+    :root:not([data-animations="off"]) .mod-list-grid .mod-card.mod-leaving {
+        animation: none;
+    }
 }
 
 /* Hero icon inline (for list view - before mod name) */
@@ -340,6 +493,27 @@
     overflow: hidden;
     text-overflow: ellipsis;
     width: 100%;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7), 0 0 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Hover reveal for truncated names. The inner span is shifted with `left`
+   (transforms don't apply to inline boxes) so the resting ellipsis still works. */
+.mod-name-inner {
+    position: relative;
+    left: 0;
+}
+
+.mod-name-text.is-scrolling {
+    text-overflow: clip;
+}
+
+.mod-name-text.is-scrolling .mod-name-inner {
+    animation: mod-name-reveal var(--reveal-duration, 2s) ease-in-out forwards;
+}
+
+@keyframes mod-name-reveal {
+    from { left: 0; }
+    to { left: var(--reveal-distance, 0px); }
 }
 
 .mod-name-suffix {

@@ -9,6 +9,9 @@
 *.png
 *.ico
 
+# Atomic-write temp files that some tools create before renaming over the real file
+*.tmp.*
+
 # Ignore node_modules
 node_modules
 
