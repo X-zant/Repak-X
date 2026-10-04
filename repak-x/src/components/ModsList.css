@@ -20,10 +20,6 @@
             transparent 100%);
     pointer-events: none;
     z-index: 10;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    mask-image: linear-gradient(to top, black 0%, black 50%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to top, black 0%, black 50%, transparent 100%);
 }
 
 /* Mods List Container */
@@ -221,6 +217,9 @@
     max-height: 120px;
     position: relative;
     overflow: hidden;
+    /* Offscreen cards skip layout and paint; the list is not virtualized */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 120px;
 }
 
 .mod-card:hover {
@@ -493,7 +492,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     width: 100%;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7), 0 0 8px rgba(0, 0, 0, 0.4);
+    text-shadow: var(--mod-name-shadow, 0 1px 3px rgba(0, 0, 0, 0.7), 0 0 8px rgba(0, 0, 0, 0.4));
 }
 
 /* Hover reveal for truncated names. The inner span is shifted with `left`

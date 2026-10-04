@@ -55,6 +55,8 @@
 }
 
 [data-theme="light"] {
+  /* Dark text needs a light halo over the hero backgrounds, not a dark one */
+  --mod-name-shadow: 0 0 4px rgba(255, 255, 255, 0.45);
   /* Better contrast with distinct gray shades instead of pure whites */
   --bg-darkest: #e8e8ec;
   --bg-darker: #eeeeef;

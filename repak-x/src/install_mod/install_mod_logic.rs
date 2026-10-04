@@ -99,6 +99,51 @@ fn existing_install_nines(dir: &Path, clean_base: &str) -> Option<usize> {
     best
 }
 
+/// Fail early, before anything is deleted, when an installed copy of this mod is
+/// held open by another process (typically the game with the mod still loaded).
+///
+/// Cleanup runs before the IoStore is written, and the game keeps the old
+/// `.ucas`/`.utoc` open without write sharing. Without this check the `.pak` is
+/// removed, the `.ucas` is not, and the tool then fails writing over it, leaving a
+/// half-deleted mod behind.
+fn ensure_mod_not_locked(output_dir: &Path, base_name: &str) -> Result<(), String> {
+    let (_, clean_base, _) = split_mod_name(base_name);
+    let entries = fs::read_dir(output_dir).map_err(|e| e.to_string())?;
+
+    for entry in entries.flatten() {
+        if !entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
+            continue;
+        }
+        let file_name = entry.file_name();
+        let Some(name) = file_name.to_str() else {
+            continue;
+        };
+        let lower = name.to_lowercase();
+        if !(lower.ends_with(".pak") || lower.ends_with(".utoc") || lower.ends_with(".ucas")) {
+            continue;
+        }
+        let Some(stem) = installed_stem(name) else {
+            continue;
+        };
+        let (_, base, _) = split_mod_name(&stem);
+        if !stem.eq_ignore_ascii_case(base_name) && !base.eq_ignore_ascii_case(&clean_base) {
+            continue;
+        }
+
+        // Write access without truncating: fails with a sharing violation while
+        // another process holds the file open.
+        if let Err(e) = fs::OpenOptions::new().write(true).open(entry.path()) {
+            if e.kind() == std::io::ErrorKind::PermissionDenied || e.raw_os_error() == Some(32) {
+                return Err(format!(
+                    "'{}' is in use by another process. Close the game (or unload the mod) and try again; nothing was changed.",
+                    name
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Clean up any existing variants of a mod file (.bak_repak, .pak_disabled) before installing
 /// This prevents duplicate entries when reinstalling a toggled-off mod
 fn cleanup_existing_mod_variants(output_dir: &Path, base_name: &str) {
@@ -342,6 +387,15 @@ pub fn install_mods_in_viewport(
             let base = normalize_mod_base_name(&installable_mod.mod_name, BASE_MOD_NINES);
 
             // Clean up any existing variants before installing
+            if let Err(msg) = ensure_mod_not_locked(&output_directory, &base) {
+                error!("Install aborted: {}", msg);
+                results.push(ModInstallResult {
+                    mod_name: installable_mod.mod_name.clone(),
+                    success: false,
+                    error: Some(msg),
+                });
+                continue;
+            }
             cleanup_existing_mod_variants(&output_directory, &base);
             let dests = vec![
                 (pak_path, format!("{}.pak", base)),
@@ -386,6 +440,15 @@ pub fn install_mods_in_viewport(
             );
             // Clean up any existing variants before installing
             let base = normalize_mod_base_name(&installable_mod.mod_name, BASE_MOD_NINES);
+            if let Err(msg) = ensure_mod_not_locked(&output_directory, &base) {
+                error!("Install aborted: {}", msg);
+                results.push(ModInstallResult {
+                    mod_name: installable_mod.mod_name.clone(),
+                    success: false,
+                    error: Some(msg),
+                });
+                continue;
+            }
             cleanup_existing_mod_variants(&output_directory, &base);
 
             // Use optimized path: UAssetTool extracts PAK internally, no Rust-side temp dir
@@ -455,6 +518,15 @@ pub fn install_mods_in_viewport(
         if installable_mod.is_dir {
             // Clean up any existing variants before installing
             let base = normalize_mod_base_name(&installable_mod.mod_name, BASE_MOD_NINES);
+            if let Err(msg) = ensure_mod_not_locked(&output_directory, &base) {
+                error!("Install aborted: {}", msg);
+                results.push(ModInstallResult {
+                    mod_name: installable_mod.mod_name.clone(),
+                    success: false,
+                    error: Some(msg),
+                });
+                continue;
+            }
             cleanup_existing_mod_variants(&output_directory, &base);
 
             // Copy source directory to temp dir to avoid modifying original files

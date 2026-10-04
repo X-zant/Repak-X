@@ -998,11 +998,20 @@
     animation: ae-spin 0.8s linear infinite;
 }
 
-.ae-toast {
+.ae-toast-anchor {
     position: fixed;
     bottom: 2.5rem;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 60;
+}
+
+.ae-toast {
+    /* Stays on its own layer, so the fade never re-rasterizes the text */
+    will-change: transform, opacity;
     padding: 0.5rem 0.9rem;
     border-radius: 8px;
     background: var(--bg-light);

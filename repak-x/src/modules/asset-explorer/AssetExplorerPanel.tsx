@@ -120,9 +120,12 @@ export default function AssetExplorerPanel() {
         }
     }, [tree, viewMode, query, filteredRows.length])
 
+    // A newer toast must not be cut short by the previous one's timer
+    const toastTimerRef = useRef<number | null>(null)
     const showToast = useCallback((message: string) => {
         setToast(message)
-        setTimeout(() => setToast(null), 1800)
+        if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current)
+        toastTimerRef.current = window.setTimeout(() => setToast(null), 1800)
     }, [])
 
     // "Show in Asset Explorer" in the main window, from either a cold start
@@ -565,18 +568,22 @@ export default function AssetExplorerPanel() {
                 {refreshing && <span className="ae-status-dim">Rescanning…</span>}
             </div>
 
-            <AnimatePresence>
-                {toast && (
-                    <motion.div
-                        className="ae-toast"
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 8 }}
-                    >
-                        {toast}
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            {/* The anchor centers it: Framer's inline transform replaces any CSS one */}
+            <div className="ae-toast-anchor">
+                <AnimatePresence>
+                    {toast && (
+                        <motion.div
+                            className="ae-toast"
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 8 }}
+                            transition={{ duration: 0.18, ease: 'easeOut' }}
+                        >
+                            {toast}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
         </div>
     )
 }

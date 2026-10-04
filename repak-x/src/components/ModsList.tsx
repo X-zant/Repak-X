@@ -374,7 +374,9 @@ const ModItem = memo(function ModItem({
                                 handleToggleModSelection(mod, e)
                             } else if (e.ctrlKey || e.metaKey) {
                                 handleToggleModSelection(mod, e)
-                            } else {
+                            } else if (e.detail <= 1) {
+                                // The second click of a rename double-click must not
+                                // toggle the details panel back
                                 onSelect(mod)
                             }
                         }}
@@ -565,6 +567,17 @@ export default function ModsList({
     holdToDelete,
     enableAnimations = true
 }: ModsListProps) {
+    // Stem key: a toggle renames the file but must not remount the card. An enabled
+    // and a disabled copy of one mod share a stem though, and duplicate keys leave
+    // ghost cards behind that no refresh removes - the later copy keys on its path.
+    const seenStems = new Set<string>()
+    const keyOf = (path: string) => {
+        const stem = path.replace(/\.(pak|bak_repak|pak_disabled)$/i, '')
+        if (seenStems.has(stem)) return path
+        seenStems.add(stem)
+        return stem
+    }
+
     return (
         <div className="mods-list-wrapper">
             <div
@@ -582,8 +595,7 @@ export default function ModsList({
                         const details = modDetails?.[mod.path]
                         return (
                             <ModItem
-                                // Stem key: a toggle renames the file but must not remount the card
-                                key={mod.path.replace(/\.(pak|bak_repak|pak_disabled)$/i, '')}
+                                key={keyOf(mod.path)}
                                 mod={mod}
                                 isViewing={selectedMod?.path === mod.path}
                                 isChecked={selectedMods.has(mod.path)}

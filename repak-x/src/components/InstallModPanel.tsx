@@ -288,13 +288,18 @@ export default function InstallModPanel({ mods, allTags, folders = [], currentFo
 
   const handleInstall = () => {
     const modsToInstall = mods
-      .map((mod, idx) => ({
-        ...mod,
-        ...modSettings[idx],
-        toRepak: isRepakLocked(mod) ? false : (modSettings[idx]?.toRepak || false),
-        forceLegacy: modSettings[idx]?.forceLegacy || false,
-        installSubfolder: modSettings[idx]?.installSubfolder || ''
-      }))
+      .map((mod, idx) => {
+        // The root folder's id is its on-disk name (e.g. "~mods"); the backend expects
+        // an empty subfolder for root, otherwise it installs into "~mods/~mods".
+        const subfolder = modSettings[idx]?.installSubfolder
+        return {
+          ...mod,
+          ...modSettings[idx],
+          toRepak: isRepakLocked(mod) ? false : (modSettings[idx]?.toRepak || false),
+          forceLegacy: modSettings[idx]?.forceLegacy || false,
+          installSubfolder: !subfolder || subfolder === rootFolder?.id ? '' : subfolder
+        }
+      })
       .filter(m => m.enabled !== false)
     onInstall(modsToInstall)
   }

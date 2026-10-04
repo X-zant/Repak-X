@@ -2,6 +2,21 @@
  * Mod-related utility functions
  */
 
+/**
+ * Counts the mods a list of dropped paths represents.
+ * An IoStore bundle (.pak + .utoc + .ucas sharing a name) is one mod, not three.
+ *
+ * @param {string[]} paths - Dropped file/folder paths
+ * @returns {number} Number of distinct mods
+ */
+export function countModsInPaths(paths: string[]): number {
+    const mods = new Set<string>();
+    for (const path of paths) {
+        mods.add(path.toLowerCase().replace(/\.(pak|utoc|ucas)$/, ''));
+    }
+    return mods.size;
+}
+
 type ModDetails = {
     additional_categories?: string[];
     mod_type?: string;

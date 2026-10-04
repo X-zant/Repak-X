@@ -82,7 +82,7 @@ import OnboardingTour from './components/OnboardingTour'
 import { toTagArray } from './utils/tags'
 import { detectHeroes, PROJECT_GALACTA_HERO_ID } from './utils/heroes'
 import { formatFileSize, normalizeModBaseName } from './utils/format'
-import { getAdditionalCategories } from './utils/mods'
+import { countModsInPaths, getAdditionalCategories } from './utils/mods'
 
 const ACCENT_COLORS_MAP: Record<string, string> = {
   red: '#be1c1c',
@@ -317,6 +317,8 @@ function App() {
   const [lastPanelWidth, setLastPanelWidth] = useState(70) // to restore after collapse (default 30% right panel)
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false)
   const [isResizing, setIsResizing] = useState(false)
+  // True once the details panel has finished sliding in
+  const [isPanelSettled, setIsPanelSettled] = useState(false)
   const [filtersHeight, setFiltersHeight] = useState<number | null>(null)
   const [isFiltersResizing, setIsFiltersResizing] = useState(false)
   const [selectedMods, setSelectedMods] = useState<Set<string>>(new Set())
@@ -329,6 +331,8 @@ function App() {
   // Latest details for callbacks with stale closures (e.g. the file watcher's loadMods)
   const modDetailsRef = useRef(modDetails)
   modDetailsRef.current = modDetails
+  // `modified_date:file_size` each mod had when its details were fetched
+  const modDetailsSigRef = useRef<Record<string, string>>({})
   const commitModDetails = (next: Record<string, any>) => {
     modDetailsRef.current = next
     setModDetails(next)
@@ -722,7 +726,7 @@ function App() {
               )
             }
 
-            return { count: pathCount, folder: folderName }
+            return { count: countModsInPaths(pathsCopy), folder: folderName }
           } finally {
             setIsModsLoading(false)
             setModLoadingProgress(0)
@@ -1024,10 +1028,17 @@ function App() {
   };
 
   const handleModSelect = (mod: ModRecord) => {
+    const isViewed = selectedMod?.path === mod.path
     setSelectedMod(mod)
-    if (autoOpenDetails && !isRightPanelOpen) {
+    if (!autoOpenDetails) return
+    if (!isRightPanelOpen) {
       setLeftPanelWidth(lastPanelWidth > 60 ? lastPanelWidth : 70) // Ensure reasonable width
       setIsRightPanelOpen(true)
+    } else if (isViewed) {
+      // Clicking the card already on show closes the panel again
+      setLastPanelWidth(leftPanelWidth)
+      setLeftPanelWidth(100)
+      setIsRightPanelOpen(false)
     }
   }
 
@@ -1885,17 +1896,32 @@ function App() {
         if (!currentPaths.has(p)) orphanedByStem.set(stemOf(p), d)
       }
       const carried: Record<string, any> = {}
+      const sigs = modDetailsSigRef.current
       for (const m of modList) {
         if (existing[m.path]) continue
-        const d = orphanedByStem.get(stemOf(m.path))
-        if (d) carried[m.path] = d
+        const stem = stemOf(m.path)
+        const d = orphanedByStem.get(stem)
+        if (d) {
+          carried[m.path] = d
+          const oldPath = Object.keys(sigs).find(p => p !== m.path && stemOf(p) === stem)
+          if (oldPath) sigs[m.path] = sigs[oldPath]
+        }
       }
-      const base = Object.keys(carried).length > 0 ? { ...existing, ...carried } : existing
-      if (base !== existing) commitModDetails(base)
+      // Drop mods that are gone so they stop counting toward the hero filter
+      const stalePaths = Object.keys(existing).filter(p => !currentPaths.has(p))
+      const changed = stalePaths.length > 0 || Object.keys(carried).length > 0
+      const base = changed ? { ...existing, ...carried } : existing
+      for (const p of stalePaths) {
+        delete base[p]
+        delete sigs[p]
+      }
+      if (changed) commitModDetails(base)
 
-      const pathsToFetch = modList
-        .map(m => m.path)
-        .filter(p => !base[p])
+      // Details are keyed by path, so a mod replaced in place (same filename) would
+      // keep showing the old version's contents - refetch when the file changed.
+      const sigOf = (m: ModRecord) => `${m.modified_date ?? 0}:${m.file_size ?? 0}`
+      const modsToFetch = modList.filter(m => !base[m.path] || sigs[m.path] !== sigOf(m))
+      const pathsToFetch = modsToFetch.map(m => m.path)
 
       if (pathsToFetch.length === 0) {
         // Already have details; recompute filters source lists
@@ -1923,6 +1949,7 @@ function App() {
         const path = pathsToFetch[idx]
         if (res.status === 'fulfilled' && res.value) {
           newMap[path] = res.value
+          sigs[path] = sigOf(modsToFetch[idx])
         }
       })
       commitModDetails(newMap)
@@ -2109,9 +2136,9 @@ function App() {
     // No confirmation prompt needed here, the hold-to-delete button handles the intent
 
     try {
-      // Strip .bak_repak extension to get base path for proper deletion of all associated files
-      const basePath = modPath.replace(/\.bak_repak$/i, '.pak')
-      await invoke('delete_mod', { path: basePath })
+      // Pass the real path: delete_mod resolves the associated IoStore files itself, and
+      // rewriting .bak_repak to .pak deleted the enabled copy when both exist.
+      await invoke('delete_mod', { path: modPath })
       setStatus('Mod deleted')
 
       // Clear selection if the deleted mod was selected
@@ -2125,6 +2152,7 @@ function App() {
     }
   }
 
+  const togglingModsRef = useRef<Set<string>>(new Set())
   const handleToggleMod = async (modPath: string) => {
     if (gameRunning && !bypassGameRunningLock) {
       alert.warning(
@@ -2133,6 +2161,11 @@ function App() {
       )
       return
     }
+    // A toggle renames the file, so a second click before the list has reloaded
+    // would send the old path. Keyed by stem, which survives the rename.
+    const toggleKey = modPath.replace(/\.(pak|bak_repak|pak_disabled)$/i, '')
+    if (togglingModsRef.current.has(toggleKey)) return
+    togglingModsRef.current.add(toggleKey)
     try {
       const newState = await invoke('toggle_mod', { modPath })
       setStatus(newState ? 'Mod enabled' : 'Mod disabled')
@@ -2157,6 +2190,8 @@ function App() {
       scheduleSafeModsRefresh('single-toggle-post-reload')
     } catch (error) {
       setStatus('Error toggling mod: ' + error)
+    } finally {
+      togglingModsRef.current.delete(toggleKey)
     }
   }
 
@@ -2288,7 +2323,7 @@ function App() {
             await loadFolders()
             setStatus(`Installed ${pathCount} item(s) to "${folderName}"!`)
 
-            return { count: pathCount, folder: folderName, isInstall: true, isMove: false }
+            return { count: countModsInPaths(pathsCopy), folder: folderName, isInstall: true, isMove: false }
           } else {
             setStatus(`Folder "${folderName}" created`)
             return { folder: folderName, isInstall: false, isMove: false }
@@ -2814,7 +2849,7 @@ function App() {
             )
           }
 
-          return { count: pathCount }
+          return { count: countModsInPaths(pathsCopy) }
         } finally {
           setIsModsLoading(false)
           setModLoadingProgress(0)
@@ -3173,6 +3208,16 @@ function App() {
     lastRevealedModRef.current = revealKey
     card.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [selectedMod, filteredMods])
+
+  // The list reflows when the details panel settles, which can push the
+  // selected card out of view
+  useEffect(() => {
+    if (!isPanelSettled || !selectedMod) return
+    const escaped = selectedMod.path.replace(/["\\]/g, '\\$&')
+    modsGridRef.current
+      ?.querySelector<HTMLElement>(`[data-mod-path="${escaped}"]`)
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [isPanelSettled])
 
   // Group mods by folder
   const modsByFolder: Record<string, ModRecord[]> = {}
@@ -3957,9 +4002,9 @@ function App() {
           {/* Wrapper for Left Sidebar and Center Panel */}
           <motion.div
             className="content-wrapper"
+            initial={false}
             animate={{ width: `${leftPanelWidth}%` }}
-            transition={isResizing ? { duration: 0 } : { type: "tween", ease: "circOut", duration: 0.35 }}
-
+            transition={isResizing || !enableAnimations ? { duration: 0 } : { type: "tween", ease: "circOut", duration: 0.35 }}
           >
             {/* Left Sidebar - Folders */}
             <div className="left-sidebar" data-tour="folder-sidebar">
@@ -4304,20 +4349,24 @@ function App() {
             </div>
           </motion.div>
 
-          {/* Resize Handle */}
+          {/* Details slot: slides in on the compositor (transform only),
+              keeping its full width so its content never re-wraps mid-animation */}
           <motion.div
+            className="right-panel-slot"
+            style={{ width: `${100 - (isRightPanelOpen ? leftPanelWidth : lastPanelWidth)}%` }}
+            initial={false}
+            animate={{ x: isRightPanelOpen ? '0%' : '100%' }}
+            transition={enableAnimations ? { type: "tween", ease: "circOut", duration: 0.35 } : { duration: 0 }}
+            onAnimationComplete={() => setIsPanelSettled(isRightPanelOpen)}
+          >
+          {/* Resize Handle */}
+          <div
             className="resize-handle"
             onMouseDown={handleResizeStart}
-            animate={{ left: `${leftPanelWidth}%` }}
-            transition={isResizing ? { duration: 0 } : { type: "tween", ease: "circOut", duration: 0.35 }}
           />
 
           {/* Right Panel - Mod Details (Always Visible) */}
-          <motion.div
-            className="right-panel"
-            animate={{ width: `${100 - leftPanelWidth}%` }}
-            transition={isResizing ? { duration: 0 } : { type: "tween", ease: "circOut", duration: 0.35 }}
-          >
+          <div className="right-panel">
             {selectedMod ? (
               <div className="mod-details-and-contents">
                 <div className="mod-details-wrapper">
@@ -4341,6 +4390,7 @@ function App() {
                 <p>Select a mod to view details</p>
               </div>
             )}
+          </div>
           </motion.div>
         </div>
       </div >

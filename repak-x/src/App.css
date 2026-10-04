@@ -143,7 +143,6 @@ body {
   border-color: color-mix(in srgb, var(--accent-primary), transparent 24%);
   box-shadow: 0 0 18px color-mix(in srgb, var(--accent-primary), transparent 70%),
     0 8px 20px color-mix(in srgb, var(--accent-primary), transparent 78%);
-  transform: translateY(-1px) scale(1.01);
 }
 
 .btn-vfx svg {
@@ -354,7 +353,7 @@ body {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 60%;
+  left: 0;
   z-index: 10;
   display: flex;
   align-items: center;
@@ -420,6 +419,16 @@ body {
   flex-shrink: 0;
   overflow: hidden;
   min-width: 180px;
+}
+
+/* Overlays the list and slides with a transform; .main-panels clips it when closed */
+.right-panel-slot {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  will-change: transform;
 }
 
 .right-panel {

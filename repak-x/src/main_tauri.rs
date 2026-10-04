@@ -164,9 +164,29 @@ struct AppState {
     /// Last known crash folder name for detecting crashes from previous sessions
     #[serde(default)]
     last_known_crash_folder: Option<String>,
-    /// Cache for mod details to avoid redundant PAK opens (path -> (mtime, details))
+    /// Cache for mod details to avoid redundant PAK opens (path -> (fingerprint, details))
     #[serde(skip)]
-    mod_details_cache: std::collections::HashMap<PathBuf, (std::time::SystemTime, ModDetails)>,
+    mod_details_cache: std::collections::HashMap<PathBuf, (ModFingerprint, ModDetails)>,
+}
+
+/// `(mtime, len)` of a mod's `.pak` and its `.utoc`/`.ucas` siblings.
+///
+/// The `.pak` of an IoStore mod is a tiny stub whose mtime can survive a re-export
+/// while the real content in the `.utoc`/`.ucas` changes, so the details cache has
+/// to key on all three files rather than the `.pak` mtime alone.
+type ModFingerprint = [Option<(std::time::SystemTime, u64)>; 3];
+
+fn mod_fingerprint(path: &std::path::Path) -> ModFingerprint {
+    let stat = |p: PathBuf| {
+        std::fs::metadata(p)
+            .ok()
+            .and_then(|m| m.modified().ok().map(|t| (t, m.len())))
+    };
+    [
+        stat(path.to_path_buf()),
+        stat(path.with_extension("utoc")),
+        stat(path.with_extension("ucas")),
+    ]
 }
 
 impl Default for AppState {
@@ -2925,6 +2945,23 @@ async fn install_mods(
             .map_err(|e| format!("Failed to create mods directory: {}", e))?;
     }
 
+    // The frontend identifies the root folder by its on-disk name (see `get_folders`),
+    // so a destination equal to that name means the root itself - joining it onto
+    // `mod_directory` would install into a same-named subfolder of the root.
+    let root_folder_name = mod_directory
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("~mods")
+        .to_string();
+    let resolve_subfolder = |subfolder: &str| -> String {
+        let trimmed = subfolder.trim_matches(|c| c == '/' || c == '\\');
+        if trimmed == "~mods" || trimmed == root_folder_name {
+            String::new()
+        } else {
+            subfolder.to_string()
+        }
+    };
+
     // Convert paths to properly initialized InstallableMods
     use crate::install_mod::map_paths_to_mods;
 
@@ -3058,7 +3095,7 @@ async fn install_mods(
 
             installable.repak = mod_to_install.to_repak;
             installable.force_legacy_pak = mod_to_install.force_legacy;
-            installable.install_subfolder = mod_to_install.install_subfolder.clone();
+            installable.install_subfolder = resolve_subfolder(&mod_to_install.install_subfolder);
             installable.obfuscate = mod_to_install.obfuscate;
             installable.hybrid = mod_to_install.hybrid;
         } else {
@@ -3067,7 +3104,7 @@ async fn install_mods(
             // These flags were already correctly set by find_mods_from_archive
             // based on the actual PAK contents. Overriding them breaks IoStore conversion.
             if let Some(first_mod) = mods.first() {
-                installable.install_subfolder = first_mod.install_subfolder.clone();
+                installable.install_subfolder = resolve_subfolder(&first_mod.install_subfolder);
                 installable.obfuscate = first_mod.obfuscate;
                 installable.hybrid = first_mod.hybrid;
                 // repak and force_legacy_pak are intentionally NOT overridden
@@ -3368,6 +3405,22 @@ async fn delete_mod(
     };
 
     log::info!("Base path for IoStore files: {:?}", base_pak_path);
+
+    // An enabled and a disabled copy of the same mod can sit side by side (e.g. a
+    // new export dropped next to a disabled one). They share the IoStore files, so
+    // those must outlive the copy being deleted.
+    let sibling_path = if actual_path.to_string_lossy().ends_with(".bak_repak") {
+        base_pak_path.clone()
+    } else {
+        actual_path.with_extension("bak_repak")
+    };
+    if sibling_path.exists() {
+        log::info!(
+            "Keeping IoStore files, still used by: {:?}",
+            sibling_path
+        );
+        return Ok(());
+    }
 
     // Delete associated IoStore files (.ucas and .utoc)
     let ucas_path = base_pak_path.with_extension("ucas");
@@ -6286,8 +6339,8 @@ if not exist "{temp_dir}\extracted" mkdir "{temp_dir}\extracted"
 powershell -Command "Expand-Archive -LiteralPath '{zip_path}' -DestinationPath '{temp_dir}\extracted' -Force" 2>nul
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Failed to extract update archive!
-    echo Please extract manually from: {zip_path}
-    echo To: {app_dir}
+    echo Please extract manually from: "{zip_path}"
+    echo To: "{app_dir}"
     pause
     exit /b 1
 )
@@ -6303,9 +6356,9 @@ for /d %%i in ("{temp_dir}\extracted\*") do (
 :: If exactly one subfolder exists and it contains an exe or dll, use that folder
 if "%FOLDER_COUNT%"=="1" (
     if exist "%EXTRACTED_DIR%\*.exe" (
-        echo Found nested folder: %EXTRACTED_DIR%
+        echo Found nested folder: "%EXTRACTED_DIR%"
     ) else if exist "%EXTRACTED_DIR%\*.dll" (
-        echo Found nested folder: %EXTRACTED_DIR%
+        echo Found nested folder: "%EXTRACTED_DIR%"
     ) else (
         set "EXTRACTED_DIR={temp_dir}\extracted"
     )
@@ -6313,16 +6366,16 @@ if "%FOLDER_COUNT%"=="1" (
     set "EXTRACTED_DIR={temp_dir}\extracted"
 )
 
-echo Source: %EXTRACTED_DIR%
-echo Destination: {app_dir}
+echo Source: "%EXTRACTED_DIR%"
+echo Destination: "{app_dir}"
 echo.
 
 echo Copying new files...
 xcopy /E /Y /I /Q "%EXTRACTED_DIR%\*" "{app_dir}\" >nul
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Failed to copy update files!
-    echo Please copy manually from: %EXTRACTED_DIR%
-    echo To: {app_dir}
+    echo Please copy manually from: "%EXTRACTED_DIR%"
+    echo To: "{app_dir}"
     pause
     exit /b 1
 )
@@ -7287,19 +7340,19 @@ fn compute_mod_details(
     }
 
     // --- Cache check ---
-    let mtime = std::fs::metadata(&path)
-        .and_then(|m| m.modified())
-        .map_err(|e| format!("Failed to get file metadata: {}", e))?;
+    let fingerprint = mod_fingerprint(&path);
 
     {
         let state_guard = state.lock().unwrap();
-        if let Some((cached_mtime, cached_details)) = state_guard.mod_details_cache.get(&path) {
-            if *cached_mtime == mtime {
+        if let Some((cached_fingerprint, cached_details)) =
+            state_guard.mod_details_cache.get(&path)
+        {
+            if *cached_fingerprint == fingerprint {
                 // Once per mod, and a hit is the uninteresting case
                 debug!("Cache hit for mod: {}", path.display());
                 return Ok(cached_details.clone());
             } else {
-                info!("Cache stale for mod: {} (mtime changed)", path.display());
+                info!("Cache stale for mod: {} (files changed)", path.display());
             }
         }
     }
@@ -7460,7 +7513,7 @@ fn compute_mod_details(
         let mut state_guard = state.lock().unwrap();
         state_guard
             .mod_details_cache
-            .insert(path.clone(), (mtime, details.clone()));
+            .insert(path.clone(), (fingerprint, details.clone()));
         info!("Cached details for mod: {}", path.display());
     }
     // --- End cache store ---
