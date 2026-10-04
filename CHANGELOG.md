@@ -12,4 +12,4 @@
 ### 🎨 Frontend / UI
 - Auto-open details now also closes the panel when clicking the viewed mod
 - Fixed ghost mod cards with enabled and disabled copies of the same mod
-- Minor UI improvements
+- Minor UI improvements and bug fixes
