@@ -10,7 +10,7 @@ use std::sync::{Mutex as StdMutex, OnceLock};
 // SYNCHRONOUS UASSETTOOL WRAPPER (in-process NativeAOT FFI)
 // ============================================================================
 // This module provides a synchronous interface to UAssetTool. It loads the
-// NativeAOT-compiled UAssetTool library (UAssetTool.dll / .so / .dylib) and calls
+// NativeAOT-compiled UAssetTool library (UAssetTool.dll / .so) and calls
 // the C-exported `uat_invoke` / `uat_free` functions directly. No child process,
 // no stdin/stdout pipe.
 //
@@ -70,11 +70,7 @@ impl SyncToolkit {
         {
             "libUAssetTool.so"
         }
-        #[cfg(target_os = "macos")]
-        {
-            "libUAssetTool.dylib"
-        }
-        #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
         {
             "UAssetTool.dll"
         }
@@ -125,11 +121,7 @@ impl SyncToolkit {
         {
             "linux-x64"
         }
-        #[cfg(target_os = "macos")]
-        {
-            "osx-x64"
-        }
-        #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
         {
             "win-x64"
         } // fallback

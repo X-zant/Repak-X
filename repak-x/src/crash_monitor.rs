@@ -63,20 +63,7 @@ pub fn get_crash_log_path() -> PathBuf {
             .join(".steam/steam/steamapps/compatdata/2767030/pfx/drive_c/users/steamuser/AppData/Local/Marvel/Saved/Crashes")
     }
 
-    #[cfg(target_os = "macos")]
-    {
-        // macOS - Marvel Rivals may run via CrossOver or similar
-        // TODO: Determine actual path when macOS support is added
-        if let Some(home) = dirs::home_dir() {
-            home.join("Library/Application Support/Marvel/Saved/Crashes")
-        } else {
-            PathBuf::from("/Users")
-                .join(std::env::var("USER").unwrap_or_else(|_| "user".to_string()))
-                .join("Library/Application Support/Marvel/Saved/Crashes")
-        }
-    }
-
-    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     {
         // Fallback for other platforms
         PathBuf::new()

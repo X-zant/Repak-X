@@ -3799,15 +3799,6 @@ async fn open_in_explorer(path: String) -> Result<(), String> {
             .map_err(|e| format!("Failed to open explorer: {}", e))?;
     }
 
-    #[cfg(target_os = "macos")]
-    {
-        // On macOS, use open -R to reveal the file in Finder
-        std::process::Command::new("open")
-            .args(["-R", &path_buf.to_string_lossy()])
-            .spawn()
-            .map_err(|e| format!("Failed to open Finder: {}", e))?;
-    }
-
     #[cfg(target_os = "linux")]
     {
         // On Linux, open the parent directory
@@ -3848,27 +3839,6 @@ async fn copy_to_clipboard(text: String, window: Window) -> Result<(), String> {
             .creation_flags(0x08000000) // CREATE_NO_WINDOW - prevents PowerShell window from showing
             .spawn()
             .map_err(|e| format!("Failed to copy to clipboard: {}", e))?;
-
-        child
-            .wait()
-            .map_err(|e| format!("Failed to copy to clipboard: {}", e))?;
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        use std::io::Write;
-        use std::process::{Command, Stdio};
-
-        let mut child = Command::new("pbcopy")
-            .stdin(Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("Failed to copy to clipboard: {}", e))?;
-
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(text.as_bytes())
-                .map_err(|e| format!("Failed to write to clipboard: {}", e))?;
-        }
 
         child
             .wait()
@@ -3930,7 +3900,7 @@ async fn copy_to_clipboard(text: String, window: Window) -> Result<(), String> {
 /// True when `a` and `b` are the same path except for letter case (e.g.
 /// "banners" vs "BANNERS"). Used to recognize a case-only rename, which
 /// `Path::exists()` can't distinguish from a genuine name collision on a
-/// case-insensitive filesystem (Windows, and macOS by default).
+/// case-insensitive filesystem (Windows).
 fn is_case_only_rename(a: &Path, b: &Path) -> bool {
     a != b && a.to_string_lossy().to_lowercase() == b.to_string_lossy().to_lowercase()
 }
@@ -5322,7 +5292,7 @@ async fn launch_game(state: State<'_, Arc<Mutex<AppState>>>) -> Result<(), Strin
                             }
                         }
 
-                        // for macos and windows
+                        // for windows
                         #[cfg(not(target_os = "linux"))]
                         {
                             let process_name = process.name().to_string_lossy().to_lowercase();
@@ -6012,8 +5982,6 @@ async fn check_for_updates(window: Window) -> Result<Option<UpdateInfo>, String>
                     "Windows"
                 } else if cfg!(target_os = "linux") {
                     "Linux"
-                } else if cfg!(target_os = "macos") {
-                    "macOS"
                 } else {
                     ""
                 };
@@ -6053,16 +6021,6 @@ async fn check_for_updates(window: Window) -> Result<Option<UpdateInfo>, String>
                             name.ends_with(".tar.gz")
                                 || name.ends_with(".AppImage")
                                 || name.ends_with(".deb")
-                        }) {
-                            asset_url = asset["browser_download_url"]
-                                .as_str()
-                                .map(|s| s.to_string());
-                            asset_name = asset["name"].as_str().map(|s| s.to_string());
-                        }
-                    } else if cfg!(target_os = "macos") {
-                        if let Some(asset) = assets.iter().find(|a| {
-                            let name = a["name"].as_str().unwrap_or("");
-                            name.ends_with(".zip") || name.ends_with(".dmg")
                         }) {
                             asset_url = asset["browser_download_url"]
                                 .as_str()
@@ -8372,16 +8330,7 @@ StartupNotify=true
     Ok(())
 }
 
-#[cfg(target_os = "macos")]
-fn register_protocol_handler() -> Result<(), Box<dyn std::error::Error>> {
-    // On macOS, protocol handlers are registered via Info.plist in the app bundle
-    // This is typically done at build time, not runtime
-    // For now, just log that it's not implemented
-    info!("macOS protocol handler registration is handled via Info.plist at build time");
-    Ok(())
-}
-
-#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
 fn register_protocol_handler() -> Result<(), Box<dyn std::error::Error>> {
     // No-op on other platforms
     Ok(())

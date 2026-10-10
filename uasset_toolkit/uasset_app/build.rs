@@ -11,8 +11,6 @@ fn get_runtime_identifier() -> &'static str {
             "windows".to_string()
         } else if cfg!(target_os = "linux") {
             "linux".to_string()
-        } else if cfg!(target_os = "macos") {
-            "macos".to_string()
         } else {
             "windows".to_string() // default fallback
         }
@@ -20,7 +18,6 @@ fn get_runtime_identifier() -> &'static str {
 
     match target_os.as_str() {
         "linux" => "linux-x64",
-        "macos" => "osx-x64",
         _ => "win-x64",
     }
 }
@@ -30,8 +27,6 @@ fn get_native_lib_name() -> &'static str {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_else(|_| {
         if cfg!(target_os = "windows") {
             "windows".to_string()
-        } else if cfg!(target_os = "macos") {
-            "macos".to_string()
         } else {
             "linux".to_string()
         }
@@ -39,21 +34,30 @@ fn get_native_lib_name() -> &'static str {
 
     match target_os.as_str() {
         "windows" => "UAssetTool.dll",
-        "macos" => "libUAssetTool.dylib",
         _ => "libUAssetTool.so",
+    }
+}
+
+/// File name `dotnet publish` gives the NativeAOT library. It is named after the assembly
+/// with no `lib` prefix on every platform, so on Unix it differs from the name the loader
+/// expects (`get_native_lib_name`) and has to be renamed when copied.
+fn get_built_lib_name() -> &'static str {
+    match get_native_lib_name() {
+        "libUAssetTool.so" => "UAssetTool.so",
+        other => other,
     }
 }
 
 fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();
     // OUT_DIR = target/<profile>/build/uasset_app-XXingr/out -> target/<profile>
+    // (newer cargo: target/<profile>/build/uasset_app/XXingr/out). Walk up to the
+    // `build` dir rather than counting parents so both layouts resolve the same.
     let target_dir = Path::new(&out_dir)
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap();
+        .ancestors()
+        .find(|p| p.file_name().map_or(false, |n| n == "build"))
+        .and_then(Path::parent)
+        .expect("Failed to derive target directory from OUT_DIR");
     // Place the native library directly beside the final executable so the Rust
     // loader (`SyncToolkit::find_dll_path`) finds it as its primary location, and
     // so the OS resolves the library's own native deps from the same directory.
@@ -162,7 +166,7 @@ fn main() {
         let status = cmd.status();
         match status {
             Ok(s) if s.success() => {
-                let built_lib = native_dir.join(lib_name);
+                let built_lib = native_dir.join(get_built_lib_name());
                 if built_lib.exists() {
                     match fs::copy(&built_lib, &dest_lib) {
                         Ok(_) => {
@@ -193,7 +197,10 @@ fn main() {
 
     // 2) Fall back to an already-built library (native or publish dir).
     if !produced {
-        for candidate in [native_dir.join(lib_name), publish_dir.join(lib_name)] {
+        for candidate in [
+            native_dir.join(get_built_lib_name()),
+            publish_dir.join(get_built_lib_name()),
+        ] {
             if candidate.exists() {
                 if let Err(e) = fs::copy(&candidate, &dest_lib) {
                     println!(
@@ -272,7 +279,6 @@ fn copy_native_deps(src_dir: &Path, dest_dir: &Path) {
     let native_deps = [
         "blake3_dotnet.dll",
         "libblake3_dotnet.so",
-        "libblake3_dotnet.dylib",
     ];
 
     for dep_name in &native_deps {

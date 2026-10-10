@@ -1,4 +1,4 @@
 [toolchain]
-channel = "nightly"
+channel = "nightly-2026-03-29"
 targets = [ "x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu" ]
 profile = "complete"

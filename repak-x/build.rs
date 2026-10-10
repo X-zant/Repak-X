@@ -9,9 +9,6 @@ fn main() {
 
     #[cfg(target_os = "linux")]
     linux_build();
-
-    #[cfg(target_os = "macos")]
-    macos_build();
 }
 
 #[cfg(target_os = "linux")]
@@ -20,9 +17,11 @@ fn linux_build() {
 
     // Compute key paths from OUT_DIR
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    // Walk up to the `build` dir instead of counting parents: newer cargo nests build
+    // script output one level deeper (build/<pkg>/<hash>/out vs build/<pkg>-<hash>/out).
     let target_dir = out_dir
-        .parent()
-        .and_then(Path::parent)
+        .ancestors()
+        .find(|p| p.file_name().map_or(false, |n| n == "build"))
         .and_then(Path::parent)
         .and_then(Path::parent)
         .map(|p| p.to_path_buf())
@@ -191,59 +190,6 @@ fn linux_build() {
     }
 }
 
-#[cfg(target_os = "macos")]
-fn macos_build() {
-    use std::{env, fs, path::Path, path::PathBuf};
-
-    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-    let target_dir = out_dir
-        .parent()
-        .and_then(Path::parent)
-        .and_then(Path::parent)
-        .and_then(Path::parent)
-        .map(|p| p.to_path_buf())
-        .expect("Failed to derive target directory from OUT_DIR");
-
-    let profile = env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
-    let exe_dir = target_dir.join(&profile);
-
-    // Copy character_data.json
-    let char_data_src = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("src")
-        .join("data")
-        .join("character_data.json");
-    let char_data_dest_dir = exe_dir.join("data");
-    let char_data_dest = char_data_dest_dir.join("character_data.json");
-
-    if char_data_src.exists() {
-        if let Err(e) = fs::create_dir_all(&char_data_dest_dir) {
-            println!(
-                "cargo:warning=failed to create data directory {}: {}",
-                char_data_dest_dir.display(),
-                e
-            );
-        } else {
-            match fs::copy(&char_data_src, &char_data_dest) {
-                Ok(_) => {
-                    println!(
-                        "cargo:warning=character_data.json copied to {}",
-                        char_data_dest.display()
-                    );
-                }
-                Err(e) => {
-                    println!(
-                        "cargo:warning=failed to copy character_data.json to {}: {}",
-                        char_data_dest.display(),
-                        e
-                    );
-                }
-            }
-        }
-    }
-
-    println!("cargo:warning=macOS build: UAssetTool support requires 'dotnet publish -r osx-x64'");
-}
-
 #[cfg(windows)]
 fn windows_build() {
     use std::{env, fs, path::Path, path::PathBuf};
@@ -253,9 +199,11 @@ fn windows_build() {
 
     // Compute key paths from OUT_DIR
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    // Walk up to the `build` dir instead of counting parents: newer cargo nests build
+    // script output one level deeper (build/<pkg>/<hash>/out vs build/<pkg>-<hash>/out).
     let target_dir = out_dir
-        .parent()
-        .and_then(Path::parent)
+        .ancestors()
+        .find(|p| p.file_name().map_or(false, |n| n == "build"))
         .and_then(Path::parent)
         .and_then(Path::parent)
         .map(|p| p.to_path_buf())
