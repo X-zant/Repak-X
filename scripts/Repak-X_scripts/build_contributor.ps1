@@ -134,6 +134,12 @@ try {
         
         # Build UAssetToolNative AOT library from submodule
         Write-Info "Building UAssetToolNative (AOT DLL) from submodule..."
+        # The AOT link step calls vswhere.exe by bare name; it lives in the VS
+        # Installer folder, which is normally not on PATH (same fix as uasset_app/build.rs)
+        $vsInstaller = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer"
+        if (Test-Path (Join-Path $vsInstaller "vswhere.exe")) {
+            $env:PATH = "$vsInstaller;$env:PATH"
+        }
         & dotnet publish $toolProject `
             -c Release `
             -r win-x64 `

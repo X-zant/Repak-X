@@ -839,7 +839,7 @@ function App() {
   const handleViewChangelog = async () => {
     try {
       console.debug('[Changelog] Manual changelog open requested from settings');
-      const res = await fetch('https://api.github.com/repos/XzantGaming/Repak-X/releases/latest', {
+      const res = await fetch('https://api.github.com/repos/X-zant/Repak-X/releases/latest', {
         headers: { 'Accept': 'application/vnd.github.v3+json' }
       });
       console.debug('[Changelog] Latest changelog fetch response', { status: res.status, ok: res.ok });
@@ -1736,7 +1736,7 @@ function App() {
           const tagCandidates = [`v${normalizedVersion}`, normalizedVersion]
 
           for (const tag of tagCandidates) {
-            const tagUrl = `https://api.github.com/repos/XzantGaming/Repak-X/releases/tags/${encodeURIComponent(tag)}`
+            const tagUrl = `https://api.github.com/repos/X-zant/Repak-X/releases/tags/${encodeURIComponent(tag)}`
             console.debug('[Changelog] Trying tag endpoint', { tag, tagUrl })
             const tagRes = await fetch(tagUrl, { headers })
             console.debug('[Changelog] Tag endpoint response', { tag, status: tagRes.status, ok: tagRes.ok })
@@ -1752,7 +1752,7 @@ function App() {
 
           // Fallback: releases/latest (helps when the expected tag is not published yet)
           if (!releaseBody) {
-            const latestUrl = 'https://api.github.com/repos/XzantGaming/Repak-X/releases/latest'
+            const latestUrl = 'https://api.github.com/repos/X-zant/Repak-X/releases/latest'
             console.debug('[Changelog] Falling back to latest release endpoint', { latestUrl })
             const latestRes = await fetch(latestUrl, { headers })
             console.debug('[Changelog] Latest release response', { status: latestRes.status, ok: latestRes.ok })

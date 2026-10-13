@@ -9,14 +9,10 @@ mod crash_monitor;
 mod discord_presence;
 mod hero_assets;
 mod install_mod;
-mod ip_obfuscation;
 mod merge_command;
 mod p2p_libp2p;
 mod p2p_manager;
-mod p2p_protocol;
-mod p2p_security;
 mod p2p_sharing;
-mod p2p_stream;
 mod toast_events;
 mod uasset_api_integration;
 mod uasset_detection;
@@ -959,18 +955,7 @@ async fn set_mod_priority(
         return Err("A mod with this priority already exists".to_string());
     }
 
-    // Rename main file
-    std::fs::rename(&path, &new_path).map_err(|e| format!("Failed to rename mod: {}", e))?;
-
-    // Rename associated files (.utoc, .ucas)
-    let exts = ["utoc", "ucas"];
-    for ext in exts {
-        let old_f = path.with_extension(ext);
-        if old_f.exists() {
-            let new_f = new_path.with_extension(ext);
-            let _ = std::fs::rename(old_f, new_f);
-        }
-    }
+    rename_mod_files(&path, &new_path).map_err(|e| format!("Failed to rename mod: {}", e))?;
 
     // Invalidate cache for old path
     {
@@ -3291,9 +3276,11 @@ async fn install_mods(
         }
 
         // --- CLEANUP TEMP HYBRID FOLDERS ---
+        // Only our own merge folders: a user's folder with the same prefix must survive
+        let merge_temp_base = app_dir().join("temp");
         for path in unique_paths {
             if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-                if file_name.starts_with("hybrid_merge_") {
+                if file_name.starts_with("hybrid_merge_") && path.starts_with(&merge_temp_base) {
                     if let Err(e) = std::fs::remove_dir_all(&path) {
                         let _ = window_for_logs.emit(
                             "install_log",
@@ -3928,6 +3915,68 @@ fn rename_path_case_safe(old: &Path, new: &Path) -> std::io::Result<()> {
     std::fs::rename(&temp_path, new)
 }
 
+/// Renames a mod's main file together with its IoStore side files (.utoc,
+/// .ucas). The three must always share one name, so if any rename fails the
+/// ones already done are undone and the mod is left as it was.
+fn rename_mod_files(old: &Path, new: &Path) -> std::io::Result<()> {
+    let mut pairs = vec![(old.to_path_buf(), new.to_path_buf())];
+    for ext in ["utoc", "ucas"] {
+        let old_side = old.with_extension(ext);
+        if old_side.exists() {
+            pairs.push((old_side, new.with_extension(ext)));
+        }
+    }
+
+    let mut done: Vec<&(PathBuf, PathBuf)> = Vec::new();
+    for pair in &pairs {
+        let (from, to) = pair;
+        // rename() replaces an existing file, which would erase another mod's data
+        let result = if to.exists() && !is_case_only_rename(from, to) {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::AlreadyExists,
+                format!("{} already exists", to.display()),
+            ))
+        } else {
+            rename_path_case_safe(from, to)
+        };
+        if let Err(e) = result {
+            for (from, to) in done.into_iter().rev() {
+                let _ = std::fs::rename(to, from);
+            }
+            return Err(e);
+        }
+        done.push(pair);
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod rename_mod_files_tests {
+    use super::rename_mod_files;
+
+    #[test]
+    fn failed_rename_leaves_all_three_files_in_place() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = |name: &str| dir.path().join(name);
+        for name in ["a.pak", "a.utoc", "a.ucas", "b.ucas"] {
+            std::fs::write(p(name), name).unwrap();
+        }
+
+        assert!(rename_mod_files(&p("a.pak"), &p("b.pak")).is_err());
+        for name in ["a.pak", "a.utoc", "a.ucas"] {
+            assert!(p(name).exists(), "{name} should be back");
+        }
+        assert!(!p("b.pak").exists() && !p("b.utoc").exists());
+        assert_eq!(std::fs::read_to_string(p("b.ucas")).unwrap(), "b.ucas");
+
+        std::fs::remove_file(p("b.ucas")).unwrap();
+        rename_mod_files(&p("a.pak"), &p("b.pak")).unwrap();
+        for name in ["b.pak", "b.utoc", "b.ucas"] {
+            assert!(p(name).exists(), "{name} should exist");
+        }
+    }
+}
+
 #[tauri::command]
 async fn rename_mod(
     mod_path: String,
@@ -4023,42 +4072,13 @@ async fn rename_mod(
         return Err(error_msg);
     }
 
-    // If it's a .pak or .bak_repak file, rename associated IoStore files (.ucas, .utoc) FIRST
-    // Do this before renaming the main file to ensure we have the correct old stem
-    if is_pak_type {
-        // Rename .ucas file if it exists
-        let old_ucas = parent.join(format!("{}.ucas", old_stem));
-        let new_ucas = parent.join(format!("{}.ucas", new_stem));
-        info!(
-            "rename_mod: checking ucas: {} exists={}",
-            old_ucas.display(),
-            old_ucas.exists()
-        );
-        if old_ucas.exists() {
-            match rename_path_case_safe(&old_ucas, &new_ucas) {
-                Ok(_) => info!("rename_mod: renamed ucas to {}", new_ucas.display()),
-                Err(e) => warn!("rename_mod: failed to rename ucas: {}", e),
-            }
-        }
-
-        // Rename .utoc file if it exists
-        let old_utoc = parent.join(format!("{}.utoc", old_stem));
-        let new_utoc = parent.join(format!("{}.utoc", new_stem));
-        info!(
-            "rename_mod: checking utoc: {} exists={}",
-            old_utoc.display(),
-            old_utoc.exists()
-        );
-        if old_utoc.exists() {
-            match rename_path_case_safe(&old_utoc, &new_utoc) {
-                Ok(_) => info!("rename_mod: renamed utoc to {}", new_utoc.display()),
-                Err(e) => warn!("rename_mod: failed to rename utoc: {}", e),
-            }
-        }
-    }
-
-    // Rename the main file
-    if let Err(e) = rename_path_case_safe(&old_path_buf, &new_path) {
+    // A .pak or .bak_repak carries its IoStore files (.ucas, .utoc) along
+    let renamed = if is_pak_type {
+        rename_mod_files(&old_path_buf, &new_path)
+    } else {
+        rename_path_case_safe(&old_path_buf, &new_path)
+    };
+    if let Err(e) = renamed {
         let error_msg = format!("Failed to rename file: {}", e);
         toast_events::emit_rename_failed(&window, &error_msg);
         return Err(error_msg);
@@ -4547,25 +4567,22 @@ async fn assign_mod_to_folder(
         game_path.join(filename)
     };
 
-    // Move the main file
-    if let Err(e) = std::fs::rename(&source_path, &dest_path) {
-        let error_msg = format!("Failed to move mod: {}", e);
+    if dest_path == source_path {
+        return Ok(());
+    }
+
+    // rename() replaces an existing file, which would erase the mod already there
+    if dest_path.exists() {
+        let error_msg = "A mod with this name already exists in that folder".to_string();
         toast_events::emit_move_failed(&window, &error_msg);
         return Err(error_msg);
     }
 
-    // Also move .utoc and .ucas files if they exist (IoStore files)
-    let utoc_source = source_path.with_extension("utoc");
-    let ucas_source = source_path.with_extension("ucas");
-
-    if utoc_source.exists() {
-        let utoc_dest = dest_path.with_extension("utoc");
-        let _ = std::fs::rename(&utoc_source, &utoc_dest);
-    }
-
-    if ucas_source.exists() {
-        let ucas_dest = dest_path.with_extension("ucas");
-        let _ = std::fs::rename(&ucas_source, &ucas_dest);
+    // Move the mod together with its .utoc and .ucas files (IoStore files)
+    if let Err(e) = rename_mod_files(&source_path, &dest_path) {
+        let error_msg = format!("Failed to move mod: {}", e);
+        toast_events::emit_move_failed(&window, &error_msg);
+        return Err(error_msg);
     }
 
     Ok(())
@@ -4675,6 +4692,16 @@ async fn toggle_mod(
     } else {
         path.with_extension("pak")
     };
+
+    // rename() replaces an existing file, which would erase the other copy
+    if new_path.exists() {
+        let error_msg = format!(
+            "Cannot toggle: \"{}\" already exists",
+            new_path.file_name().unwrap_or_default().to_string_lossy()
+        );
+        toast_events::emit_toggle_failed(&window, &error_msg);
+        return Err(error_msg);
+    }
 
     if let Err(e) = std::fs::rename(&path, &new_path) {
         let error_msg = format!("Failed to toggle mod: {}", e);
@@ -5935,7 +5962,7 @@ async fn check_for_updates(window: Window) -> Result<Option<UpdateInfo>, String>
     ui_log::info("Update", "Checking for a newer Repak-X release...");
 
     let client = reqwest::Client::new();
-    let url = "https://api.github.com/repos/XzantGaming/Repak-X/releases/latest";
+    let url = "https://api.github.com/repos/X-zant/Repak-X/releases/latest";
 
     let res = client
         .get(url)
@@ -6082,6 +6109,8 @@ struct ExtractionProgress {
     status: String, // "extracting", "complete", "error"
 }
 
+const UPDATE_ASSET_URL_PREFIX: &str = "https://github.com/X-zant/Repak-X/releases/download/";
+
 /// Download an update from the given URL
 /// Returns the path to the downloaded file
 #[tauri::command]
@@ -6093,6 +6122,16 @@ async fn download_update(
     use tokio::io::AsyncWriteExt;
 
     info!("Starting update download from: {}", asset_url);
+
+    // Both values arrive from the UI: only fetch our own release assets, and
+    // never let the name point outside the temp folder.
+    if !asset_url.starts_with(UPDATE_ASSET_URL_PREFIX) {
+        return Err(format!("Refusing update from unexpected URL: {}", asset_url));
+    }
+    let asset_name = Path::new(&asset_name)
+        .file_name()
+        .ok_or("Invalid update file name")?
+        .to_owned();
 
     // Create temp directory for the update
     let temp_dir = std::env::temp_dir().join("repakx_update");
@@ -6206,6 +6245,17 @@ async fn download_update(
         .await
         .map_err(|e| format!("Failed to flush file: {}", e))?;
     drop(file);
+
+    // A cut-off download must never be handed to apply_update
+    if let Some(total) = total_size {
+        if downloaded != total {
+            let _ = std::fs::remove_file(&download_path);
+            return Err(format!(
+                "Update download incomplete: got {} of {} bytes",
+                downloaded, total
+            ));
+        }
+    }
 
     info!("Update downloaded to: {:?}", download_path);
 
@@ -7139,15 +7189,23 @@ fn save_state(state: &AppState) -> std::io::Result<()> {
     let dir = app_dir();
     std::fs::create_dir_all(&dir)?;
     let path = dir.join("state.json");
-    let file = File::create(path)?;
-    serde_json::to_writer_pretty(file, state)?;
-    Ok(())
+    // Write a temp file and swap it in, so a crash mid-write cannot truncate state.json
+    let tmp_path = dir.join("state.json.tmp");
+    let file = File::create(&tmp_path)?;
+    serde_json::to_writer_pretty(&file, state)?;
+    file.sync_all()?;
+    std::fs::rename(tmp_path, path)
 }
 
 fn load_state() -> AppState {
     let path = app_dir().join("state.json");
-    let mut state = if let Ok(file) = File::open(path) {
-        serde_json::from_reader(file).unwrap_or_default()
+    let mut state = if let Ok(file) = File::open(&path) {
+        serde_json::from_reader(file).unwrap_or_else(|e| {
+            // Keep the unreadable file: the next save would otherwise overwrite it
+            error!("state.json is unreadable ({}), starting with defaults", e);
+            let _ = std::fs::copy(&path, path.with_extension("json.bad"));
+            AppState::default()
+        })
     } else {
         AppState::default()
     };

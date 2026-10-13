@@ -7,7 +7,6 @@
 //! - Random share code generation for peer discovery
 //! - TCP-based file transfer with progress tracking
 
-// use crate::ip_obfuscation; // Disabled - P2P stub mode
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
@@ -709,8 +708,15 @@ impl P2PServer {
 
     /// Handle the client session protocol
     fn handle_client_session(&self, stream: &mut TcpStream) -> P2PResult<()> {
-        // Read hello message
+        // Read hello message. The server handles one peer at a time, so a
+        // stranger who connects and stays silent must not hold it for long.
+        stream
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .map_err(|e| P2PError::NetworkError(format!("Failed to set timeout: {}", e)))?;
         let hello_data = read_encrypted_message(stream, &self.encryption_key)?;
+        stream
+            .set_read_timeout(Some(Duration::from_secs(120)))
+            .map_err(|e| P2PError::NetworkError(format!("Failed to set timeout: {}", e)))?;
         let hello: P2PMessage = bincode::deserialize(&hello_data)
             .map_err(|e| P2PError::ProtocolError(format!("Invalid hello message: {}", e)))?;
 
@@ -1107,6 +1113,14 @@ impl P2PClient {
         expected_hash: &str,
         output_dir: &Path,
     ) -> P2PResult<u64> {
+        // The name comes from the sender - never let it leave output_dir
+        if !is_plain_file_name(filename) {
+            return Err(P2PError::ValidationError(format!(
+                "Refusing unsafe file name from sender: {}",
+                filename
+            )));
+        }
+
         // Update progress
         {
             let mut progress = self.progress.lock().unwrap();
@@ -1216,6 +1230,12 @@ impl P2PClient {
 // PROTOCOL HELPERS
 // ============================================================================
 
+/// True when `name` is a bare file name: no folders, no "..", no drive or root.
+fn is_plain_file_name(name: &str) -> bool {
+    !name.contains(['/', '\\', ':'])
+        && Path::new(name).file_name().and_then(|n| n.to_str()) == Some(name)
+}
+
 /// Send an encrypted message over the stream
 fn send_encrypted_message<T: Serialize>(
     stream: &mut TcpStream,
@@ -1288,8 +1308,9 @@ fn read_encrypted_message(stream: &mut TcpStream, key: &[u8; 32]) -> P2PResult<V
         .map_err(|e| P2PError::NetworkError(format!("Failed to read length: {}", e)))?;
     let len = u32::from_be_bytes(len_bytes) as usize;
 
-    if len > 100 * 1024 * 1024 {
-        // 100MB max message size
+    // The biggest real message is one file chunk; the length is read before the
+    // key is checked, so keep what a stranger can make us allocate small.
+    if len > 8 * CHUNK_SIZE {
         return Err(P2PError::ProtocolError("Message too large".to_string()));
     }
 
@@ -1459,6 +1480,14 @@ impl Default for P2PManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_rejects_unsafe_file_names() {
+        assert!(is_plain_file_name("Mod_9999999_P.pak"));
+        for bad in ["..\\x.pak", "../x.pak", "a/b.pak", "C:\\x.pak", "C:x.pak", "/x.pak", "..", ""] {
+            assert!(!is_plain_file_name(bad), "{bad}");
+        }
+    }
 
     #[test]
     fn test_share_code_generation() {

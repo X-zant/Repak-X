@@ -33,13 +33,35 @@ pub fn extract_rar(rar_path: &str, output_dir: &str) -> Result<(), unrar::error:
     let mut archive = Archive::new(rar_path).open_for_processing()?;
     while let Some(header) = archive.read_header()? {
         let filename = header.entry().filename.clone();
-        archive = if header.entry().is_file() {
+        // Entry names come from the archive - skip any that would leave output_dir
+        archive = if header.entry().is_file() && is_safe_entry_path(&filename) {
             header.extract_to(output_dir.join(filename))?
         } else {
             header.skip()?
         };
     }
     Ok(())
+}
+
+/// True when `path` stays inside the folder it is joined to: no "..", root or drive.
+fn is_safe_entry_path(path: &Path) -> bool {
+    path.components()
+        .all(|c| matches!(c, std::path::Component::Normal(_)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_entries_that_escape() {
+        assert!(is_safe_entry_path(Path::new("Mods/a.pak")));
+        for bad in ["../a.pak", "Mods/../../a.pak", "/a.pak"] {
+            assert!(!is_safe_entry_path(Path::new(bad)), "{bad}");
+        }
+        #[cfg(windows)]
+        assert!(!is_safe_entry_path(Path::new("C:\\a.pak")));
+    }
 }
 
 pub fn extract_7z(archive_path: &str, output_dir: &str) -> io::Result<()> {

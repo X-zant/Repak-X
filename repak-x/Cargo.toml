@@ -82,24 +82,6 @@ igd-next = { version = "0.16", features = ["aio_tokio"] }
 # Free TCP relay tunnel (bore.pub) for NAT traversal fallback
 bore-cli = "0.6"
 
-# libp2p for internet-wide P2P with NAT traversal
-libp2p = { version = "0.54", features = [
-    "tcp",
-    "noise",
-    "yamux",
-    "gossipsub",
-    "kad",
-    "identify",
-    "relay",
-    "dcutr",
-    "autonat",
-    "macros",
-    "tokio",
-    "request-response"
-] }
-futures = "0.3"
-async-trait = "0.1"
-
 # Character data management
 once_cell = "1.19"
 chrono = "0.4"
