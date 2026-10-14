@@ -38,6 +38,7 @@ import ModDetailsPanel from './components/ModDetailsPanel'
 import ModsList from './components/ModsList'
 import FileTree from './components/FileTree'
 import FolderTree from './components/FolderTree'
+import { VFX_WINDOW_WIDTH, VFX_WINDOW_HEIGHT } from './modules/vfx-updater/types'
 import ContextMenu from './components/ContextMenu'
 import LogDrawer from './components/LogDrawer'
 import DropZoneOverlay from './components/DropZoneOverlay'
@@ -487,8 +488,8 @@ function App() {
       const vfxWindow = new WebviewWindow('vfx-updater', {
         url: '/vfx-updater',
         title: 'Repak VFX Updater',
-        width: 650,
-        height: 750,
+        width: VFX_WINDOW_WIDTH,
+        height: VFX_WINDOW_HEIGHT,
         center: true,
         resizable: false,
         decorations: false,

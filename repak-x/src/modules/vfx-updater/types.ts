@@ -1,5 +1,9 @@
 // VFX Updater - Type Definitions
 
+// Logical size of the VFX Updater window (content area)
+export const VFX_WINDOW_WIDTH = 650;
+export const VFX_WINDOW_HEIGHT = 750;
+
 export interface ColorParam {
   id: string;
   fileName: string;
