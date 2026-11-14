@@ -5,7 +5,7 @@ import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-shell';
 import { IoIosSkipForward } from "react-icons/io";
 import { RiFileZipFill } from "react-icons/ri";
-import { FaUsers } from "react-icons/fa";
+import { FaUsers, FaUnlockAlt } from "react-icons/fa";
 import { FaToolbox } from "react-icons/fa6";
 import { MdRemoveModerator } from "react-icons/md";
 import { VscListTree } from "react-icons/vsc";
@@ -34,6 +34,8 @@ type ToolsPanelProps = {
     projectGalactaMod?: { path: string; enabled?: boolean } | null;
     /** Enables/disables the detected Project Galacta mod. */
     onToggleProjectGalacta?: () => Promise<void>;
+    /** Called after Deobfuscate changed at least one mod, so cached mod details get refetched. */
+    onModsDeobfuscated?: () => void;
 };
 
 type StatusTone = 'on' | 'off' | 'unknown' | 'error';
@@ -53,7 +55,7 @@ type ToolCardConfig = {
     progress?: RecompressProgress;
 };
 
-export default function ToolsPanel({ onClose, onOpenAssetExplorer, projectGalactaMod, onToggleProjectGalacta }: ToolsPanelProps) {
+export default function ToolsPanel({ onClose, onOpenAssetExplorer, projectGalactaMod, onToggleProjectGalacta, onModsDeobfuscated }: ToolsPanelProps) {
     const [isUpdatingChars, setIsUpdatingChars] = useState(false);
     const [charUpdateStatus, setCharUpdateStatus] = useState('');
     const [isSkippingLauncher, setIsSkippingLauncher] = useState(false);
@@ -66,6 +68,9 @@ export default function ToolsPanel({ onClose, onOpenAssetExplorer, projectGalact
     const [recompressStatus, setRecompressStatus] = useState('');
     const [recompressResult, setRecompressResult] = useState<any | null>(null);
     const [recompressProgress, setRecompressProgress] = useState<RecompressProgress>({ current: 0, total: 0 });
+    const [isDeobfuscating, setIsDeobfuscating] = useState(false);
+    const [deobfuscateStatus, setDeobfuscateStatus] = useState('');
+    const [deobfuscateProgress, setDeobfuscateProgress] = useState<RecompressProgress>({ current: 0, total: 0 });
     const [isTogglingGalacta, setIsTogglingGalacta] = useState(false);
     const [galactaStatusMsg, setGalactaStatusMsg] = useState('');
 
@@ -134,6 +139,29 @@ export default function ToolsPanel({ onClose, onOpenAssetExplorer, projectGalact
             return () => clearTimeout(timer);
         }
     }, [recompressStatus, isRecompressing]);
+
+    // Clear deobfuscate status after 5 seconds
+    useEffect(() => {
+        if (deobfuscateStatus && !isDeobfuscating) {
+            const timer = setTimeout(() => {
+                setDeobfuscateStatus('');
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [deobfuscateStatus, isDeobfuscating]);
+
+    // Listen for deobfuscate progress events
+    useEffect(() => {
+        const unlisten = listen('deobfuscate_progress', (event) => {
+            const { current, total, status } = event.payload as any;
+            setDeobfuscateProgress({ current, total });
+            setDeobfuscateStatus(`${status} (${current}/${total})`);
+        });
+
+        return () => {
+            unlisten.then(f => f());
+        };
+    }, []);
 
     // Clear Project Galacta status msg after 5 seconds
     useEffect(() => {
@@ -239,6 +267,28 @@ export default function ToolsPanel({ onClose, onOpenAssetExplorer, projectGalact
         }
     };
 
+    const handleDeobfuscate = async () => {
+        setIsDeobfuscating(true);
+        setDeobfuscateStatus('Scanning mods...');
+        try {
+            const result = await invoke('deobfuscate_all_mods') as any;
+            if (result.total_scanned === 0) {
+                setDeobfuscateStatus('No IoStore mods found to scan');
+            } else if (result.deobfuscated === 0 && result.failed === 0) {
+                setDeobfuscateStatus('No obfuscated mods found');
+            } else {
+                setDeobfuscateStatus(`Deobfuscated ${result.deobfuscated} mod(s)` + (result.failed > 0 ? `, ${result.failed} failed (see logs)` : ''));
+            }
+            if (result.deobfuscated > 0) onModsDeobfuscated?.();
+        } catch (error) {
+            uiLog.error('Deobfuscate', `Deobfuscation failed: ${error}`);
+            setDeobfuscateStatus(`Error: ${error}`);
+        } finally {
+            setIsDeobfuscating(false);
+            setDeobfuscateProgress({ current: 0, total: 0 });
+        }
+    };
+
     const handleToggleProjectGalacta = async () => {
         if (!projectGalactaMod || !onToggleProjectGalacta) return;
         setIsTogglingGalacta(true);
@@ -327,6 +377,17 @@ export default function ToolsPanel({ onClose, onOpenAssetExplorer, projectGalact
             disabled: isRecompressing,
             message: recompressStatus,
             progress: recompressProgress
+        },
+        {
+            id: 'deobfuscate',
+            icon: FaUnlockAlt,
+            title: 'Deobfuscate',
+            description: 'Decrypt obfuscated IoStore mods.',
+            onClick: handleDeobfuscate,
+            busy: isDeobfuscating,
+            disabled: isDeobfuscating,
+            message: deobfuscateStatus,
+            progress: deobfuscateProgress
         }
     ];
 

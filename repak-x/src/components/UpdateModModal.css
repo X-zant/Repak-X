@@ -141,46 +141,6 @@
   flex-shrink: 0;
 }
 
-.update-obfuscation-toggle {
-  margin-bottom: 16px;
-}
-
-.update-obfuscation-toggle .obfuscate-toggle {
-  background: rgba(66, 165, 245, 0.08);
-  border: 1px solid rgba(66, 165, 245, 0.2);
-  border-radius: 12px;
-  transition: all 0.2s ease;
-}
-
-.update-obfuscation-toggle .obfuscate-toggle:hover {
-  background: rgba(66, 165, 245, 0.12);
-  border-color: rgba(66, 165, 245, 0.3);
-}
-
-.update-obfuscation-toggle .obfuscate-toggle.active {
-  background: rgba(66, 165, 245, 0.15);
-  border-color: rgba(66, 165, 245, 0.4);
-}
-
-.update-obfuscation-toggle .install-toggle__label {
-  color: #42a5f5;
-}
-
-.update-obfuscation-toggle .install-toggle__hint {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-.update-obfuscation-toggle .install-toggle__text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.update-obfuscation-toggle .install-toggle__label {
-  font-weight: 600;
-}
-
 .update-mod-modal .btn-install {
   padding: 0.75rem 2rem;
   background: var(--accent-primary);

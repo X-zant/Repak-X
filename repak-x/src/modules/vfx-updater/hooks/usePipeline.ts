@@ -116,6 +116,19 @@ export function usePipeline({
 
     const warnings: string[] = [];
 
+    // The old and _UPDATED mods override the same assets, so keep only the new one loaded.
+    const disableSourceMod = async () => {
+      const sourcePak = modPath.replace(/\.utoc$/i, ".pak");
+      // vfx_usmap_exists is a plain is-file check; skips sources already disabled or without a .pak
+      if (!(await invoke<boolean>("vfx_usmap_exists", { path: sourcePak }))) return;
+      try {
+        await invoke("toggle_mod", { modPath: sourcePak });
+        addLog(`✓ Disabled source mod: ${sourcePak.split(/[\\/]/).pop()}`, "success");
+      } catch (e) {
+        addLog(`Could not disable source mod: ${e}`, "warning");
+      }
+    };
+
     try {
       // Initialize
       addLog("Preparing VFX update pipeline.", "info");
@@ -236,6 +249,7 @@ export function usePipeline({
         checkCancel();
 
         addLog(`✓ Created updated mod: ${finalBundle}`, "success");
+        await disableSourceMod();
         setCurrentStep(9);
         addLog("Pipeline completed successfully!", "success");
 
@@ -504,6 +518,7 @@ export function usePipeline({
 
       addLog(`✓ Created updated mod: ${finalBundle}`, "success");
       console.debug("[VFX] Step 8 complete", { finalBundle });
+      await disableSourceMod();
 
       // Done!
       setCurrentStep(9);

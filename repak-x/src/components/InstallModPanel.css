@@ -415,28 +415,6 @@
   cursor: not-allowed;
 }
 
-/* Obfuscation Toggle Styling */
-.obfuscate-toggle {
-  background: rgba(66, 165, 245, 0.08);
-  border: 1px solid rgba(66, 165, 245, 0.2);
-  border-radius: 12px;
-  transition: all 0.2s ease;
-}
-
-.obfuscate-toggle:hover {
-  background: rgba(66, 165, 245, 0.12);
-  border-color: rgba(66, 165, 245, 0.3);
-}
-
-.obfuscate-toggle.active {
-  background: rgba(66, 165, 245, 0.15);
-  border-color: rgba(66, 165, 245, 0.4);
-}
-
-.obfuscate-toggle .install-toggle__label {
-  color: #42a5f5;
-}
-
 /* Hybrid IOStore Toggle Styling */
 .hybrid-toggle {
   background: rgba(76, 175, 80, 0.08);

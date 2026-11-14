@@ -2,10 +2,11 @@ import { useState, useEffect, useMemo } from 'react'
 import { useHoverTextReveal } from '../hooks/useHoverTextReveal'
 import { invoke } from '@tauri-apps/api/core'
 import { Tooltip } from '@mui/material'
-import { FaTag, FaExchangeAlt } from "react-icons/fa"
+import { FaTag, FaExchangeAlt, FaUnlockAlt } from "react-icons/fa"
 import { VscListTree } from "react-icons/vsc"
 import FileTree from './FileTree'
 import { formatFileSize } from '../utils/format'
+import { useAlert } from './AlertHandler'
 import { detectHeroesWithData } from '../utils/heroes'
 import { FALLBACK_HERO_ID, resolveHeroImage, useHeroImages } from '../utils/heroImages'
 import './ModDetailsPanel.css'
@@ -45,14 +46,34 @@ type ModDetailsPanelProps = {
   characterData?: CharacterDataEntry[]
   onUpdateMod?: () => void
   onShowInAssetExplorer?: () => void
+  /** Receives refreshed details after this mod was changed in place (e.g. deobfuscated). */
+  onDetailsChanged?: (details: ModDetailsData) => void
 }
 
-export default function ModDetailsPanel({ mod, initialDetails, onClose, characterData = [], onUpdateMod, onShowInAssetExplorer }: ModDetailsPanelProps) {
+export default function ModDetailsPanel({ mod, initialDetails, onClose, characterData = [], onUpdateMod, onShowInAssetExplorer, onDetailsChanged }: ModDetailsPanelProps) {
   // Repaint when the synced hero portraits finish loading.
   useHeroImages()
   const [details, setDetails] = useState<ModDetailsData | null>(initialDetails || null)
   const [loading, setLoading] = useState(!initialDetails)
   const [error, setError] = useState<string | null>(null)
+  const [isDeobfuscating, setIsDeobfuscating] = useState(false)
+  const alert = useAlert()
+
+  const handleDeobfuscate = async () => {
+    if (!mod) return
+    setIsDeobfuscating(true)
+    try {
+      await invoke('deobfuscate_mod', { modPath: mod.path })
+      const fresh = await invoke<ModDetailsData>('get_mod_details', { modPath: mod.path })
+      setDetails(fresh)
+      onDetailsChanged?.(fresh)
+      alert.success('Mod Deobfuscated', 'The IoStore bundle is no longer encrypted.')
+    } catch (err) {
+      alert.error('Deobfuscation Failed', String(err))
+    } finally {
+      setIsDeobfuscating(false)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -292,6 +313,17 @@ export default function ModDetailsPanel({ mod, initialDetails, onClose, characte
                       }} title="This mod package is encrypted">Encrypted</div>
                     )}
                   </div>
+                )}
+                {/* Only IoStore mods can be deobfuscated; legacy obfuscated paks are not supported */}
+                {details.is_encrypted && details.is_iostore && (
+                  <button
+                    className="copy-paths-btn"
+                    onClick={handleDeobfuscate}
+                    disabled={isDeobfuscating}
+                    title="Decrypt this IoStore bundle in place"
+                  >
+                    <FaUnlockAlt /> {isDeobfuscating ? 'Deobfuscating...' : 'Deobfuscate'}
+                  </button>
                 )}
                 {/* No UAssets badge - show if mod has no .uasset files (but not for IoStore bundles) */}
                 {!details.is_iostore && details.files && details.files.length > 0 && !details.files.some(f => f.toLowerCase().endsWith('.uasset')) && (

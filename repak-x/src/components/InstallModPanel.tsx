@@ -30,7 +30,6 @@ type ModInput = {
 
 type ModSetting = {
   enabled: boolean
-  obfuscate: boolean
   toRepak: boolean
   forceLegacy: boolean
   hybrid: boolean
@@ -181,7 +180,6 @@ const buildInitialSettings = (mods: ModInput[] = [], currentFolderId?: string): 
 
     acc[idx] = {
       enabled: true,
-      obfuscate: false,
       toRepak: effectiveToRepak,
       forceLegacy: forceLegacy,
       hybrid: isHybrid,
@@ -536,22 +534,6 @@ export default function InstallModPanel({ mods, allTags, folders = [], currentFo
                       </div>
 
                       <div className="install-mod-card__footer">
-                        <Switch
-                          size="md"
-                          color="primary"
-                          checked={modSettings[idx]?.obfuscate || false}
-                          onChange={(value) => updateModSetting(idx, 'obfuscate', value)}
-                          className={`install-toggle obfuscate-toggle ${modSettings[idx]?.obfuscate ? 'active' : ''}`}
-                          title="Encrypts IoStore with game's AES key to block FModel extraction"
-                        >
-                          <div className="install-toggle__text">
-                            <span className="install-toggle__label">Obfuscation</span>
-                            <span className="install-toggle__hint">
-                              {modSettings[idx]?.obfuscate ? 'IOStore will be AES encrypted' : 'Encrypt mod to block Fmodel extraction'}
-                            </span>
-                          </div>
-                        </Switch>
-
                         <Switch
                           size="md"
                           color="success"

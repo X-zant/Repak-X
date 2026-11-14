@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FaExchangeAlt } from 'react-icons/fa'
 import { IoWarningOutline } from 'react-icons/io5'
-import Switch from './ui/Switch'
 import './UpdateModModal.css'
 
 type ModRecord = {
@@ -13,24 +12,13 @@ type ModRecord = {
 type UpdateModModalProps = {
     isOpen: boolean
     onClose: () => void
-    onConfirm: (preserveName: boolean, obfuscate: boolean) => void
+    onConfirm: (preserveName: boolean) => void
     oldMod: ModRecord | null
     newSourcePath: string | null
-    initialObfuscate?: boolean | null
 }
 
-export default function UpdateModModal({ isOpen, onClose, onConfirm, oldMod, newSourcePath, initialObfuscate }: UpdateModModalProps) {
+export default function UpdateModModal({ isOpen, onClose, onConfirm, oldMod, newSourcePath }: UpdateModModalProps) {
     const [preserveName, setPreserveName] = useState(true)
-    const [obfuscate, setObfuscate] = useState(false)
-
-    useEffect(() => {
-        if (isOpen) {
-            const value = typeof initialObfuscate === 'boolean' ? initialObfuscate : false
-            console.debug('[UpdateModModal] Applying obfuscate value', { value })
-            setObfuscate(value)
-        }
-    }, [isOpen, initialObfuscate])
-
     if (!isOpen || !oldMod) return null
 
     // Extract filenames for display
@@ -80,27 +68,6 @@ export default function UpdateModModal({ isOpen, onClose, onConfirm, oldMod, new
                                 </div>
                             </div>
 
-                            <div className="update-obfuscation-toggle">
-                                <Switch
-                                    size="md"
-                                    color="primary"
-                                    checked={obfuscate}
-                                    onChange={(value) => {
-                                        // Per-update obfuscate; do NOT mutate global state
-                                        setObfuscate(value)
-                                    }}
-                                    className={`install-toggle obfuscate-toggle ${obfuscate ? 'active' : ''}`}
-                                    title="Encrypts IoStore with game's AES key to block FModel extraction"
-                                >
-                                    <div className="install-toggle__text">
-                                        <span className="install-toggle__label">Obfuscation</span>
-                                        <span className="install-toggle__hint">
-                                            {obfuscate ? 'IoStore will be AES encrypted' : 'Encrypt to block FModel extraction'}
-                                        </span>
-                                    </div>
-                                </Switch>
-                            </div>
-
                             <div className="options-section">
                                 <label className="checkbox-option">
                                     <input
@@ -129,7 +96,7 @@ export default function UpdateModModal({ isOpen, onClose, onConfirm, oldMod, new
                             <button className="cancel-btn" onClick={onClose}>Cancel</button>
                             <button
                                 className="btn-install"
-                                onClick={() => onConfirm(preserveName, obfuscate)}
+                                onClick={() => onConfirm(preserveName)}
                                 autoFocus
                             >
                                 Update Mod

@@ -184,7 +184,6 @@ type UpdateModState = {
   isOpen: boolean
   mod: ModRecord | null
   newSourcePath: string | null
-  obfuscatePreference: boolean | null
 }
 
 type CharacterDataEntry = {
@@ -396,8 +395,7 @@ function App() {
   const [updateModState, setUpdateModState] = useState<UpdateModState>({
     isOpen: false,
     mod: null,
-    newSourcePath: null,
-    obfuscatePreference: null
+    newSourcePath: null
   })
   const [promiseLoaderCount, setPromiseLoaderCount] = useState(0)
   const [promiseLoaderMessage, setPromiseLoaderMessage] = useState('Working...')
@@ -1319,13 +1317,10 @@ function App() {
       })
 
       if (selected) {
-        // No persisted global obfuscate preference exists; default to false
-        // (same behavior as the Install panel). The modal lets the user override.
         setUpdateModState({
           isOpen: true,
           mod: mod,
-          newSourcePath: selected,
-          obfuscatePreference: false
+          newSourcePath: selected
         })
         console.debug('[UpdateMod] Update modal opened', { modPath: mod.path, selectedPath: selected })
       }
@@ -1335,7 +1330,7 @@ function App() {
     }
   }
 
-  const handleConfirmUpdate = async (preserveName: boolean, obfuscate: boolean) => {
+  const handleConfirmUpdate = async (preserveName: boolean) => {
     const { mod, newSourcePath } = updateModState
     if (!mod || !newSourcePath) return
 
@@ -1350,8 +1345,7 @@ function App() {
       const result = await invoke('update_mod', {
         oldModPath: mod.path,
         newModSource: newSourcePath,
-        preserveName: preserveName,
-        obfuscate: obfuscate
+        preserveName: preserveName
       })
 
       console.log('Update result:', result)
@@ -3644,6 +3638,11 @@ function App() {
           onToggleProjectGalacta={async () => {
             if (projectGalactaMod) await handleToggleMod(projectGalactaMod.path)
           }}
+          onModsDeobfuscated={() => {
+            // Deobfuscating rewrites .utoc/.ucas only, so the .pak signature can't flag stale details
+            modDetailsSigRef.current = {}
+            loadMods()
+          }}
         />
       )}
 
@@ -3774,7 +3773,6 @@ function App() {
         onConfirm={handleConfirmUpdate}
         oldMod={updateModState.mod}
         newSourcePath={updateModState.newSourcePath}
-        initialObfuscate={updateModState.obfuscatePreference}
       />
 
       <PromiseTransitionLoader
@@ -4382,6 +4380,7 @@ function App() {
                     characterData={characterData}
                     onUpdateMod={() => handleInitiateUpdate(selectedMod)}
                     onShowInAssetExplorer={() => handleShowInAssetExplorer([selectedMod.path])}
+                    onDetailsChanged={(d) => commitModDetails({ ...modDetailsRef.current, [selectedMod.path]: d })}
                   />
                 </div>
 
