@@ -690,6 +690,12 @@ pub enum UAssetRequest {
     IsIoStoreCompressed { file_path: String },
     #[serde(rename = "is_iostore_encrypted")]
     IsIoStoreEncrypted { file_path: String },
+    #[serde(rename = "deobfuscate_iostore")]
+    DeobfuscateIoStore {
+        file_path: String,
+        output_path: Option<String>,
+        aes_key: Option<String>,
+    },
     #[serde(rename = "recompress_iostore")]
     RecompressIoStore { file_path: String },
     #[serde(rename = "extract_iostore")]
@@ -874,6 +880,58 @@ pub fn is_iostore_encrypted(file_path: &str) -> Result<bool> {
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
     Ok(encrypted)
+}
+
+/// Result of [`deobfuscate_iostore`].
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeobfuscateResult {
+    /// False when the container was already plain; nothing was changed.
+    pub was_encrypted: bool,
+    pub blocks_decrypted: usize,
+    pub directory_index_decrypted: bool,
+    pub utoc_path: String,
+    pub ucas_path: String,
+    pub pak_path: Option<String>,
+    pub message: String,
+}
+
+/// Turn an obfuscated (AES-encrypted) IoStore mod back into a plain one.
+///
+/// Decrypts the `.ucas` blocks where they sit and clears the `.utoc`'s Encrypted flag; nothing is
+/// extracted or repackaged, and the companion `.pak` is left as it is. `file_path` is the `.utoc`.
+/// With `output_path` None the files are replaced in place, atomically; otherwise plain copies are
+/// written to `output_path` + `.utoc`/`.ucas`/`.pak` and the originals are left alone. A wrong
+/// `aes_key` (None means the game's key) fails before anything is written. A container that is
+/// not obfuscated comes back with `was_encrypted` false.
+pub fn deobfuscate_iostore(
+    file_path: &str,
+    output_path: Option<&str>,
+    aes_key: Option<&str>,
+) -> Result<DeobfuscateResult> {
+    let toolkit = get_global_toolkit()?;
+    let request = UAssetRequest::DeobfuscateIoStore {
+        file_path: file_path.to_string(),
+        output_path: output_path.map(|s| s.to_string()),
+        aes_key: aes_key.map(|s| s.to_string()),
+    };
+    let response = toolkit.send_request(&request)?;
+    if !response.success {
+        anyhow::bail!("Failed to deobfuscate IoStore: {}", response.message);
+    }
+    let data = response.data.unwrap_or(serde_json::json!({}));
+    let str_field = |k: &str| data.get(k).and_then(|v| v.as_str()).map(|s| s.to_string());
+    Ok(DeobfuscateResult {
+        was_encrypted: data.get("was_encrypted").and_then(|v| v.as_bool()).unwrap_or(false),
+        blocks_decrypted: data.get("blocks_decrypted").and_then(|v| v.as_u64()).unwrap_or(0) as usize,
+        directory_index_decrypted: data
+            .get("directory_index_decrypted")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        utoc_path: str_field("utoc_path").unwrap_or_default(),
+        ucas_path: str_field("ucas_path").unwrap_or_default(),
+        pak_path: str_field("pak_path"),
+        message: response.message,
+    })
 }
 
 /// IoStore creation result

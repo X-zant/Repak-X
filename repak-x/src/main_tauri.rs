@@ -5640,6 +5640,179 @@ async fn toggle_sig_bypasser(state: State<'_, Arc<Mutex<AppState>>>) -> Result<S
     }
 }
 
+/// Result of [`deobfuscate_mod`].
+#[derive(Clone, Serialize, Deserialize)]
+struct DeobfuscateModResult {
+    mod_path: String,
+    /// False when the mod was already plain; nothing was changed.
+    was_encrypted: bool,
+    blocks_decrypted: usize,
+    message: String,
+}
+
+/// Result of [`deobfuscate_all_mods`].
+#[derive(Clone, Serialize, Deserialize)]
+struct DeobfuscateAllResult {
+    total_scanned: usize,
+    already_plain: usize,
+    deobfuscated: usize,
+    failed: usize,
+    details: Vec<DeobfuscateDetail>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct DeobfuscateDetail {
+    mod_name: String,
+    status: String, // "already_plain", "deobfuscated", "failed"
+    blocks_decrypted: usize,
+    error: Option<String>,
+}
+
+/// The `.utoc` of an IoStore mod, given its `.pak`, disabled `.bak_repak` or the `.utoc` itself.
+fn utoc_for_mod(mod_path: &std::path::Path) -> Result<PathBuf, String> {
+    let utoc = if mod_path.extension().and_then(|e| e.to_str()) == Some("utoc") {
+        mod_path.to_path_buf()
+    } else {
+        mod_path.with_extension("utoc")
+    };
+    if !utoc.exists() {
+        return Err(format!("Not an IoStore mod (no .utoc next to {})", mod_path.display()));
+    }
+    Ok(utoc)
+}
+
+/// Drop cached details for a mod under both its enabled and disabled names, so the next
+/// `get_mod_details` re-reads it. The fingerprint already covers the .utoc/.ucas, so this is
+/// belt and braces.
+fn evict_mod_details(state: &Arc<Mutex<AppState>>, utoc: &std::path::Path) {
+    if let Ok(mut guard) = state.lock() {
+        guard.mod_details_cache.remove(&utoc.with_extension("pak"));
+        guard.mod_details_cache.remove(&utoc.with_extension("bak_repak"));
+    }
+}
+
+/// Turn one obfuscated (AES-encrypted) IoStore mod back into a plain one, in place.
+///
+/// `mod_path` may be the mod's `.pak`, its disabled `.bak_repak`, or its `.utoc`. Only the
+/// `.utoc`/`.ucas` change: blocks are decrypted where they sit, nothing is extracted or
+/// repackaged, and files are replaced only once the whole job succeeded. A mod that is already
+/// plain is left alone and comes back with `was_encrypted: false`.
+/// `ModDetails.is_encrypted` tells the frontend which mods this applies to.
+#[tauri::command]
+async fn deobfuscate_mod(
+    mod_path: String,
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<DeobfuscateModResult, String> {
+    let utoc = utoc_for_mod(std::path::Path::new(&mod_path))?;
+
+    ui_log::info("Deobfuscate", format!("Deobfuscating {}", utoc.display()));
+    let result = uasset_toolkit::deobfuscate_iostore(&utoc.to_string_lossy(), None, None)
+        .map_err(|e| {
+            ui_log::error("Deobfuscate", format!("{}: {}", utoc.display(), e));
+            e.to_string()
+        })?;
+
+    evict_mod_details(&state, &utoc);
+    ui_log::info("Deobfuscate", result.message.clone());
+
+    Ok(DeobfuscateModResult {
+        mod_path,
+        was_encrypted: result.was_encrypted,
+        blocks_decrypted: result.blocks_decrypted,
+        message: result.message,
+    })
+}
+
+/// Deobfuscate every obfuscated IoStore mod under the mods folder, enabled or disabled.
+///
+/// Emits `deobfuscate_progress` events (`{ current, total, status }`) as it goes. One mod failing,
+/// for example because the game has it open, is recorded and does not stop the rest.
+#[tauri::command]
+async fn deobfuscate_all_mods(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    window: Window,
+) -> Result<DeobfuscateAllResult, String> {
+    let game_path = {
+        let state = state.lock().unwrap();
+        state.game_path.clone()
+    };
+    if !game_path.exists() {
+        return Err("Game path does not exist".to_string());
+    }
+
+    let utocs: Vec<PathBuf> = WalkDir::new(&game_path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .map(|e| e.path().to_path_buf())
+        .filter(|p| p.is_file() && p.extension().and_then(|s| s.to_str()) == Some("utoc"))
+        .collect();
+
+    let mut result = DeobfuscateAllResult {
+        total_scanned: utocs.len(),
+        already_plain: 0,
+        deobfuscated: 0,
+        failed: 0,
+        details: Vec::new(),
+    };
+    ui_log::info("Deobfuscate", format!("Checking {} IoStore mod(s)", utocs.len()));
+
+    for (idx, utoc) in utocs.iter().enumerate() {
+        let mod_name = utoc
+            .file_stem()
+            .and_then(|n| n.to_str())
+            .unwrap_or("Unknown")
+            .to_string();
+        let _ = window.emit(
+            "deobfuscate_progress",
+            serde_json::json!({ "current": idx + 1, "total": utocs.len(), "status": mod_name }),
+        );
+
+        let path = utoc.to_string_lossy();
+        if !uasset_toolkit::is_iostore_encrypted(&path).unwrap_or(false) {
+            result.already_plain += 1;
+            result.details.push(DeobfuscateDetail {
+                mod_name,
+                status: "already_plain".to_string(),
+                blocks_decrypted: 0,
+                error: None,
+            });
+            continue;
+        }
+
+        match uasset_toolkit::deobfuscate_iostore(&path, None, None) {
+            Ok(r) => {
+                evict_mod_details(&state, utoc);
+                result.deobfuscated += 1;
+                result.details.push(DeobfuscateDetail {
+                    mod_name,
+                    status: "deobfuscated".to_string(),
+                    blocks_decrypted: r.blocks_decrypted,
+                    error: None,
+                });
+            }
+            Err(e) => {
+                ui_log::error("Deobfuscate", format!("{}: {}", utoc.display(), e));
+                result.failed += 1;
+                result.details.push(DeobfuscateDetail {
+                    mod_name,
+                    status: "failed".to_string(),
+                    blocks_decrypted: 0,
+                    error: Some(e.to_string()),
+                });
+            }
+        }
+    }
+
+    ui_log::info(
+        "Deobfuscate",
+        format!(
+            "Done: {} deobfuscated, {} already plain, {} failed",
+            result.deobfuscated, result.already_plain, result.failed
+        ),
+    );
+    Ok(result)
+}
+
 /// Result of recompression operation
 #[derive(Clone, Serialize, Deserialize)]
 struct RecompressResult {
@@ -8830,6 +9003,8 @@ fn main() {
             get_sig_bypasser_status,
             toggle_sig_bypasser,
             recompress_mods,
+            deobfuscate_mod,
+            deobfuscate_all_mods,
             get_app_version,
             check_for_updates,
             download_update,
