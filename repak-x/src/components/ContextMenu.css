@@ -9,12 +9,12 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
   z-index: 9999;
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
 }
 
 .context-menu-header {
   padding: 6px 12px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--text-secondary);
   border-bottom: 1px solid var(--panel-border);
   margin-bottom: 4px;
@@ -34,9 +34,10 @@
   color: var(--text-primary);
 }
 
-.context-menu-item:hover {
+.context-menu-item:hover,
+.context-menu-item:focus-visible {
   background: var(--accent-primary);
-  color: white;
+  color: var(--on-accent);
 }
 
 .context-menu-item-label {
@@ -50,7 +51,7 @@
   border: none;
   color: #888;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: var(--fs-md);
   padding: 0 2px;
   line-height: 1;
   border-radius: 3px;
@@ -58,7 +59,8 @@
   transition: opacity 0.15s, color 0.15s;
 }
 
-.context-menu-item:hover .context-menu-item-delete {
+.context-menu-item:hover .context-menu-item-delete,
+.context-menu-item:focus-visible .context-menu-item-delete {
   opacity: 1;
 }
 
@@ -103,7 +105,8 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
-.context-menu-item:hover>.submenu {
+.context-menu-item:hover>.submenu,
+.submenu-trigger.open>.submenu {
   display: block;
 }
 
@@ -116,7 +119,7 @@
 
 .context-menu-item.danger:hover {
   background: var(--danger);
-  color: white;
+  color: var(--on-accent);
 }
 
 .context-menu-item.danger .danger-bg {
@@ -132,7 +135,8 @@
   transition: transform 0.2s ease;
 }
 
-.context-menu-item.danger:hover .danger-bg {
+.context-menu-item.danger:hover .danger-bg,
+.context-menu-item.danger:focus-visible .danger-bg {
   transform: scaleX(1);
 }
 
@@ -169,7 +173,7 @@
 }
 
 .rename-panel-header {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 10px;
@@ -192,7 +196,7 @@
 .rename-input {
   flex: 1;
   padding: 8px 10px;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   background: transparent;
   border: none;
   color: var(--text-primary);
@@ -202,7 +206,7 @@
 
 .rename-suffix-hint {
   padding: 8px 10px;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--text-secondary);
   background: var(--bg-dark);
   border-left: 1px solid var(--panel-border);
@@ -215,7 +219,7 @@
   padding: 6px 8px;
   background: var(--bg-dark);
   border-radius: 4px;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   display: flex;
   gap: 6px;
   align-items: center;
@@ -243,7 +247,7 @@
 
 .rename-btn {
   padding: 6px 12px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   font-weight: 500;
   border-radius: 4px;
   cursor: pointer;
@@ -264,9 +268,13 @@
 
 .rename-btn.confirm {
   background: var(--accent-primary);
-  color: white;
+  color: var(--on-accent);
 }
 
 .rename-btn.confirm:hover {
   filter: brightness(1.1);
+}
+/* Keyboard focus uses the same highlight as hover */
+.context-menu-item:focus {
+  outline: none;
 }

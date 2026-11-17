@@ -4,6 +4,7 @@ import { VscFolder, VscFolderOpened, VscChevronRight, VscChevronDown, VscClose, 
 import { MdContentCopy, MdCreateNewFolder } from 'react-icons/md';
 import { BsFiletypeRaw } from 'react-icons/bs';
 import './QuickOrganizeOverlay.css';
+import { useDialog } from '../hooks/useDialog'
 
 type FolderRecord = {
     id: string;
@@ -126,6 +127,7 @@ const QuickOrganizeOverlay = ({
     onCancel,
     onCreateFolder
 }: QuickOrganizeOverlayProps) => {
+    const dialog = useDialog(onCancel, 'Quick copy')
     const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
     const [isInstalling, setIsInstalling] = useState(false);
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
@@ -219,7 +221,8 @@ const QuickOrganizeOverlay = ({
                     onClick={handleBackdropClick}
                 >
                     <motion.div
-                        className="quick-organize-panel"
+                        {...dialog}
+                className="quick-organize-panel"
                         initial={{ y: 50, opacity: 0, scale: 0.95 }}
                         animate={{ y: 0, opacity: 1, scale: 1 }}
                         exit={{ y: 50, opacity: 0, scale: 0.95 }}
@@ -236,7 +239,7 @@ const QuickOrganizeOverlay = ({
                                     {paths.length} PAK file{paths.length > 1 ? 's' : ''} (Audio/Config)
                                 </p>
                             </div>
-                            <button className="close-btn" onClick={onCancel}>
+                            <button aria-label="Close" className="close-btn" onClick={onCancel}>
                                 <VscClose />
                             </button>
                         </div>
@@ -274,7 +277,7 @@ const QuickOrganizeOverlay = ({
                                                 autoFocus
                                                 onKeyDown={(e) => {
                                                     if (e.key === 'Enter') handleConfirmNewFolder();
-                                                    if (e.key === 'Escape') handleCancelNewFolder();
+                                                    if (e.key === 'Escape') { e.preventDefault(); handleCancelNewFolder(); }
                                                 }}
                                                 onClick={(e) => e.stopPropagation()}
                                             />

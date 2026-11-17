@@ -68,7 +68,7 @@
 }
 
 .promise-transition-loader__message {
-  font-size: 0.84rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--text-primary);
@@ -95,6 +95,6 @@
   }
 
   .promise-transition-loader__message {
-    font-size: 0.78rem;
+    font-size: var(--fs-xs);
   }
 }

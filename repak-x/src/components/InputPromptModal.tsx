@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VscClose, VscNewFolder } from 'react-icons/vsc';
 import './InputPromptModal.css';
+import { useDialog } from '../hooks/useDialog'
 
 type InputPromptModalProps = {
     isOpen: boolean;
@@ -47,6 +48,7 @@ const InputPromptModal = ({
     mode = 'input',
     description = ''
 }: InputPromptModalProps) => {
+    const dialog = useDialog(onCancel, title)
     const [value, setValue] = useState(initialValue);
     const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -99,7 +101,8 @@ const InputPromptModal = ({
                     style={style}
                 >
                     <motion.div
-                        className="input-prompt-modal"
+                        {...dialog}
+                className="input-prompt-modal"
                         initial={{ y: -20, opacity: 0, scale: 0.95 }}
                         animate={{ y: 0, opacity: 1, scale: 1 }}
                         exit={{ y: -20, opacity: 0, scale: 0.95 }}
@@ -111,7 +114,7 @@ const InputPromptModal = ({
                                 {icon}
                             </div>
                             <h3>{title}</h3>
-                            <button className="prompt-close" onClick={onCancel}>
+                            <button aria-label="Close" className="prompt-close" onClick={onCancel}>
                                 <VscClose />
                             </button>
                         </div>

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { VscChevronDown, VscChevronRight } from 'react-icons/vsc';
 import './HeroFilterDropdown.css';
 
 type ModDetailsRecord = {
@@ -154,10 +155,12 @@ const HeroFilterItem = ({ hero, selectedCharacters, onToggle }: HeroFilterItemPr
             <div className="hero-filter-row">
                 <button
                     className="hero-expand-btn"
+                    aria-label={isExpanded ? 'Collapse skins' : 'Expand skins'}
+                    aria-expanded={isExpanded}
                     onClick={handleExpandClick}
                     style={{ visibility: hasSkins || hero.baseModCount > 0 ? 'visible' : 'hidden' }}
                 >
-                    {isExpanded ? '▼' : '▶'}
+                    {isExpanded ? <VscChevronDown aria-hidden="true" /> : <VscChevronRight aria-hidden="true" />}
                 </button>
                 <button
                     className={parentClass}

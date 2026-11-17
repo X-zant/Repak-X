@@ -31,7 +31,7 @@
 .terminal-body {
   padding: 16px;
   color: #e0e0e0;
-  font-size: 14px;
+  font-size: var(--fs-sm);
   line-height: 1.5;
   min-height: 200px;
 }
@@ -55,7 +55,7 @@
   margin-bottom: 4px;
 }
 
-.terminal-line.success { color: #4caf50; }
-.terminal-line.warning { color: #ff9800; }
-.terminal-line.error { color: #f44336; }
+.terminal-line.success { color: var(--success); }
+.terminal-line.warning { color: var(--warning); }
+.terminal-line.error { color: var(--danger); }
 .terminal-line.info { color: #2196f3; }

@@ -37,7 +37,7 @@
 .shortcut-keys kbd {
   display: inline-block;
   padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   font-family: inherit;
   font-weight: 600;
   background: rgba(255, 255, 255, 0.1);
@@ -50,27 +50,27 @@
 
 .key-separator {
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: var(--fs-xs);
   margin: 0 0.15rem;
 }
 
 .shortcut-action {
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 .shortcuts-footer {
   padding: 0.75rem 1.5rem;
   border-top: 1px solid var(--panel-border);
   text-align: center;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
 }
 
 .shortcuts-footer kbd {
   display: inline-block;
   padding: 0.15rem 0.4rem;
-  font-size: 0.7rem;
+  font-size: var(--fs-xs);
   font-family: inherit;
   font-weight: 600;
   background: rgba(255, 255, 255, 0.1);

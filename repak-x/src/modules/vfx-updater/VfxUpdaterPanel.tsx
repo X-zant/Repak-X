@@ -603,7 +603,7 @@ export default function VfxUpdaterPanel() {
               className="vfx-start-wrapper"
               borderRadius={16}
               borderWidth={2}
-              shineColor={isStartDisabled ? ['var(--panel-border, #333)', 'transparent'] : ['var(--accent-primary)', 'color-mix(in srgb, var(--accent-primary), transparent 50%)']}
+              shineColor={isStartDisabled ? ['var(--panel-border)', 'transparent'] : ['var(--accent-primary)', 'color-mix(in srgb, var(--accent-primary), transparent 50%)']}
             >
               <button
                 className="vfx-start-btn"
@@ -743,7 +743,7 @@ export default function VfxUpdaterPanel() {
             onClick={handleCopyLogs}
             title="Copy all logs"
           >
-            {copyFeedback ? <span style={{ fontSize: '10px', marginRight: '4px' }}>Copied!</span> : null}
+            {copyFeedback ? <span style={{ fontSize: 'var(--fs-xs)', marginRight: '4px' }}>Copied!</span> : null}
             <BiCopyAlt size={16} />
           </button>
         )}

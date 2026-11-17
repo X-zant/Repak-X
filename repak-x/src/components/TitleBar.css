@@ -38,7 +38,7 @@
 }
 
 .titlebar-title {
-    font-size: 12px;
+    font-size: var(--fs-xs);
     font-weight: 600;
     color: var(--text-secondary);
     letter-spacing: 0.5px;
@@ -67,7 +67,7 @@
     color: var(--text-secondary);
     cursor: pointer;
     transition: background 0.2s, color 0.2s;
-    font-size: 10px;
+    font-size: var(--fs-xs);
     /* Icon size */
 }
 
@@ -78,7 +78,7 @@
 
 .titlebar-button.close:hover {
     background: #e81123;
-    color: white;
+    color: var(--on-accent);
 }
 
 /* SVG Icon styles */

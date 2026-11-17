@@ -25,7 +25,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 0.75rem 0 1rem;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   background: var(--field-bg);
   border-bottom: 1px solid var(--border-light);
   cursor: pointer;
@@ -104,7 +104,7 @@
 
 .log-drawer-icon {
   color: var(--accent-primary);
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   flex-shrink: 0;
 }
 
@@ -113,7 +113,7 @@
 }
 
 .log-drawer-count {
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   color: var(--text-secondary);
   background: var(--field-bg);
   padding: 2px 6px;
@@ -132,7 +132,7 @@
   color: var(--text-secondary);
   padding: 4px 10px;
   border-radius: 4px;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   cursor: pointer;
   transition: all 0.15s ease;
   font-family: inherit;
@@ -190,7 +190,7 @@
   color: var(--text-secondary);
   padding: 2px 9px;
   border-radius: 10px;
-  font-size: 0.7rem;
+  font-size: var(--fs-xs);
   font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
@@ -205,7 +205,7 @@
 .log-drawer-chip.active {
   background: var(--accent-primary);
   border-color: var(--accent-primary);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 /* Search */
@@ -224,7 +224,7 @@
 
 .log-drawer-search-icon {
   color: var(--text-secondary);
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   flex-shrink: 0;
 }
 
@@ -234,7 +234,7 @@
   outline: none;
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   width: 100%;
   padding: 2px 0;
 }
@@ -247,7 +247,7 @@
   display: flex;
   align-items: center;
   padding: 0;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 
 .log-drawer-search-clear:hover {
@@ -273,7 +273,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
+  font-size: var(--fs-md);
   transition: all 0.15s ease;
 }
 
@@ -291,10 +291,10 @@
 /* Copy All Feedback Toast */
 .log-drawer-feedback {
   background: var(--accent-primary);
-  color: white;
+  color: var(--on-accent);
   padding: 4px 12px;
   border-radius: 4px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   font-weight: 500;
   margin-right: 0.5rem;
   animation: fade-in 0.2s ease-out;
@@ -303,7 +303,7 @@
 
 /* Single Line Copy Success Indicator */
 .log-line-feedback {
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   color: var(--accent-primary);
   background: rgba(0, 0, 0, 0.2);
   padding: 2px 6px;
@@ -396,7 +396,7 @@
   padding: 4px 8px;
   border-radius: 4px;
   transition: background 0.1s;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   line-height: 1.4;
 }
 
@@ -405,9 +405,8 @@
 }
 
 .log-drawer-line-number {
-  color: var(--text-secondary);
-  opacity: 0.5;
-  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
   min-width: 28px;
   text-align: right;
   user-select: none;
@@ -415,9 +414,8 @@
 }
 
 .log-drawer-line-time {
-  color: var(--text-secondary);
-  opacity: 0.55;
-  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
   flex-shrink: 0;
   user-select: none;
   padding-top: 1px;
@@ -425,7 +423,7 @@
 
 .log-drawer-line-scope {
   color: var(--text-secondary);
-  font-size: 0.68rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.03em;
   text-transform: uppercase;
   background: var(--field-bg);
@@ -451,7 +449,7 @@
 .log-drawer-hidden-note {
   flex-shrink: 0;
   padding: 4px 8px 0;
-  font-size: 0.7rem;
+  font-size: var(--fs-xs);
   color: var(--text-secondary);
   opacity: 0.7;
   text-align: right;
@@ -459,7 +457,7 @@
 
 /* Log line type colors - these remain semantic colors */
 .log-drawer-line.success .log-drawer-line-content {
-  color: #4caf50;
+  color: var(--success);
   font-weight: 700;
 }
 
@@ -468,7 +466,7 @@
 }
 
 .log-drawer-line.warning .log-drawer-line-content {
-  color: #ff9800;
+  color: var(--warning);
 }
 
 .log-drawer-line.warning .log-drawer-line-number {
@@ -476,7 +474,7 @@
 }
 
 .log-drawer-line.error .log-drawer-line-content {
-  color: #f44336;
+  color: var(--danger);
 }
 
 .log-drawer-line.error .log-drawer-line-number {
@@ -500,7 +498,7 @@
 }
 
 .log-drawer-line.warn .log-drawer-line-content {
-  color: #ff9800;
+  color: var(--warning);
 }
 
 .log-drawer-line.warn .log-drawer-line-number {
@@ -519,7 +517,7 @@
 
 /* Unread problem count on the collapsed header. */
 .log-drawer-count.has-problems {
-  color: #ff9800;
+  color: var(--warning);
   background: rgba(255, 152, 0, 0.12);
   font-weight: 600;
 }

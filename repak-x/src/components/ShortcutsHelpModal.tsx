@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import './ShortcutsHelpModal.css'
+import { useDialog } from '../hooks/useDialog'
 
 type ShortcutsHelpModalProps = {
     isOpen: boolean
@@ -22,11 +23,13 @@ const shortcuts = [
 ]
 
 function ShortcutsHelpModal({ isOpen, onClose }: ShortcutsHelpModalProps) {
+    const dialog = useDialog(onClose, 'Keyboard shortcuts')
     if (!isOpen) return null
 
     return (
         <div className="modal-overlay" onClick={onClose}>
             <motion.div
+                {...dialog}
                 className="modal-content shortcuts-modal"
                 onClick={(e) => e.stopPropagation()}
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -35,8 +38,8 @@ function ShortcutsHelpModal({ isOpen, onClose }: ShortcutsHelpModalProps) {
                 transition={{ duration: 0.15 }}
             >
                 <div className="modal-header">
-                    <h2>⌨️ Keyboard Shortcuts</h2>
-                    <button className="modal-close" onClick={onClose}>×</button>
+                    <h2>Keyboard Shortcuts</h2>
+                    <button aria-label="Close" className="modal-close" onClick={onClose}>×</button>
                 </div>
                 <div className="shortcuts-list">
                     {shortcuts.map((shortcut, index) => (

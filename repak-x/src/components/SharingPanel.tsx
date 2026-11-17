@@ -23,6 +23,7 @@ import TailInput from './ui/TailInput';
 import './SharingPanel.css';
 
 import { useAlert } from './AlertHandler';
+import { useDialog } from '../hooks/useDialog'
 
 type InstalledMod = {
   path: string;
@@ -98,6 +99,7 @@ const formatDuration = (seconds: number): string => {
 };
 
 export default function SharingPanel({ onClose, gamePath, installedMods, selectedMods, folders = [] }: SharingPanelProps) {
+  const dialog = useDialog(onClose, 'Mod sharing')
   const alert = useAlert();
   const [activeTab, setActiveTab] = useState('share'); // 'share' or 'receive'
   // const [error, setError] = useState(''); // Removed local error state in favor of toasts
@@ -456,7 +458,8 @@ export default function SharingPanel({ onClose, gamePath, installedMods, selecte
   return (
     <div className="p2p-overlay">
       <motion.div
-        className="p2p-modal"
+        {...dialog}
+                className="p2p-modal"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
@@ -467,7 +470,7 @@ export default function SharingPanel({ onClose, gamePath, installedMods, selecte
             <WifiIcon className="p2p-icon" />
             <h2>Mod Sharing</h2>
           </div>
-          <button onClick={onClose} className="btn-icon-close">
+          <button onClick={onClose} className="btn-icon-close" aria-label="Close">
             <CloseIcon />
           </button>
         </div>
@@ -724,7 +727,7 @@ export default function SharingPanel({ onClose, gamePath, installedMods, selecte
                         />
                       )}
                     </div>
-                    <p style={{ fontSize: '0.8rem', opacity: 0.5, marginTop: '0.25rem' }}>
+                    <p style={{ fontSize: 'var(--fs-sm)', opacity: 0.5, marginTop: '0.25rem' }}>
                       {receiveFolderId ? `Selected destination: ${receiveFolderId}` : 'Defaults to your game mods folder'}
                     </p>
                   </div>

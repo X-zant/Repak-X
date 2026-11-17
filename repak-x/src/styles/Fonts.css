@@ -60,6 +60,15 @@
   --font-primary: 'Segoe UI', 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --font-logo: 'BBH Bartle', sans-serif;
+
+  /* Type scale: use these instead of literal font sizes */
+  --fs-xs: 0.75rem;   /* 12px: badges, meta, captions */
+  --fs-sm: 0.85rem;   /* 13.6px: secondary text, dense lists */
+  --fs-base: 0.95rem; /* 15.2px: body, controls */
+  --fs-md: 1.1rem;    /* 17.6px: section titles */
+  --fs-lg: 1.25rem;   /* 20px: panel titles */
+  --fs-xl: 1.5rem;    /* 24px: modal titles */
+  --fs-2xl: 2rem;     /* 32px: hero numbers */
 }
 
 body {

@@ -10,7 +10,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.875rem;
+  font-size: var(--fs-sm);
   color: var(--text-primary);
 }
 
@@ -25,7 +25,7 @@
 
 .repakx-progress-track {
   width: 100%;
-  background-color: var(--bg-lighter, #e4e4e7);
+  background-color: var(--bg-lighter);
   border-radius: 999px;
   overflow: hidden;
   position: relative;

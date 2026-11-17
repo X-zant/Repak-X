@@ -23,6 +23,7 @@ import DiscordWidget from './DiscordWidget'
 import './SettingsPanel.css'
 import { useAlert } from './AlertHandler'
 import { motion } from 'framer-motion'
+import { useDialog } from '../hooks/useDialog'
 
 const ACCENT_COLORS = {
   repakRed: '#be1c1c',
@@ -85,6 +86,7 @@ type SettingsPanelProps = {
 
 
 export default function SettingsPanel({ settings, onSave, onClose, theme, setTheme, accentColor, setAccentColor, gamePath, onAutoDetectGamePath, onBrowseGamePath, isGamePathLoading, setParallelProcessing, onCheckForUpdates, onViewChangelog, isCheckingUpdates, onReplayTour, onOpenShortcuts, galactaDetected }: SettingsPanelProps) {
+  const dialog = useDialog(onClose, 'Settings')
   const alert = useAlert();
   const [activeCategory, setActiveCategory] = useState<CategoryId>('general');
   const [hideSuffix, setHideSuffix] = useState(settings.hideSuffix || false);
@@ -173,7 +175,8 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
   return (
     <div className="modal-overlay" onClick={onClose}>
       <motion.div
-        className="modal-content settings-modal settings-modal-split"
+        {...dialog}
+                className="modal-content settings-modal settings-modal-split"
         onClick={(e) => e.stopPropagation()}
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -183,7 +186,7 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
           <h2>
             <IoIosSettings size={20} /> Settings
           </h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <button aria-label="Close" className="modal-close" onClick={onClose}>×</button>
         </div>
 
         <div className="settings-layout">
@@ -274,7 +277,7 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
                           <span style={{
                             position: 'relative',
                             top: '-3px',
-                            fontSize: '0.85rem',
+                            fontSize: 'var(--fs-sm)',
                             opacity: parallelProcessing ? 1 : 0.8,
                             fontWeight: parallelProcessing ? '900' : '500',
                             fontStyle: parallelProcessing ? 'italic' : 'normal',
@@ -322,7 +325,7 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
                         <MdArticle />
                         View Changelog
                       </button>
-                      <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>Current Version: v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}</span>
+                      <span style={{ fontSize: 'var(--fs-sm)', opacity: 0.6 }}>Current Version: v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}</span>
                     </div>
 
                     <Checkbox
@@ -343,12 +346,12 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
                   <div className="setting-group">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                       <AnimatedThemeToggler theme={theme} setTheme={handleThemeToggle} />
-                      <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>
+                      <span style={{ fontSize: 'var(--fs-base)', opacity: 0.8 }}>
                         {theme === 'dark' ? 'Dark Mode' : (showRatMode ? 'Rat Mode 🐀' : 'Light Mode')}
                       </span>
                     </div>
 
-                    <label style={{ display: 'block', fontSize: '0.9rem', opacity: 0.9 }}>Accent Color</label>
+                    <label style={{ display: 'block', fontSize: 'var(--fs-base)', opacity: 0.9 }}>Accent Color</label>
                     <div className="color-options">
                       {Object.entries(ACCENT_COLORS).map(([name, color]) => (
                         <button
@@ -539,7 +542,7 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
                       </button>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
-                      <span style={{ fontSize: '1rem', opacity: 0.9 }}>
+                      <span style={{ fontSize: 'var(--fs-md)', opacity: 0.9 }}>
                         Press <strong style={{ opacity: 1 }}>F1</strong> anytime to view all available keyboard shortcuts
                       </span>
                       <button
@@ -558,7 +561,7 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
                   <h3>Community</h3>
                   <div className="setting-group">
                     <div className="setting-item">
-                      <p style={{ margin: 0, fontSize: '0.925rem', fontWeight: 600, opacity: 0.9 }}>
+                      <p style={{ margin: 0, fontSize: 'var(--fs-base)', fontWeight: 600, opacity: 0.9 }}>
                         Repak X is built for the community.
                       </p>
                       <p className="setting-hint" style={{ marginBottom: 0 }}>
@@ -577,14 +580,14 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
           <button
             onClick={onClose}
             className="btn-secondary"
-            style={{ padding: '0.4rem 1rem', fontSize: '0.9rem', minWidth: 'auto' }}
+            style={{ padding: '0.4rem 1rem', fontSize: 'var(--fs-base)', minWidth: 'auto' }}
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             className="btn-primary"
-            style={{ padding: '0.4rem 1rem', fontSize: '0.9rem', minWidth: 'auto' }}
+            style={{ padding: '0.4rem 1rem', fontSize: 'var(--fs-base)', minWidth: 'auto' }}
           >
             Save
           </button>

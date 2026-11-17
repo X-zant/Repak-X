@@ -15,6 +15,7 @@ import { uiLog } from '../utils/uiLog';
 import pgIconUrl from '../assets/tools/PG_icon.webp';
 import './SettingsPanel.css'; // Reuse the same styles
 import './ToolsPanel.css';
+import { useDialog } from '../hooks/useDialog'
 
 /** Project Galacta's icon, tinted with the current theme accent color via CSS masking. */
 function ProjectGalactaIcon() {
@@ -56,6 +57,7 @@ type ToolCardConfig = {
 };
 
 export default function ToolsPanel({ onClose, onOpenAssetExplorer, projectGalactaMod, onToggleProjectGalacta, onModsDeobfuscated }: ToolsPanelProps) {
+    const dialog = useDialog(onClose, 'Tools')
     const [isUpdatingChars, setIsUpdatingChars] = useState(false);
     const [charUpdateStatus, setCharUpdateStatus] = useState('');
     const [isSkippingLauncher, setIsSkippingLauncher] = useState(false);
@@ -424,7 +426,8 @@ export default function ToolsPanel({ onClose, onOpenAssetExplorer, projectGalact
         <>
             <div className="modal-overlay" onClick={onClose}>
                 <motion.div
-                    className="modal-content settings-modal tools-modal"
+                    {...dialog}
+                className="modal-content settings-modal tools-modal"
                     onClick={(e) => e.stopPropagation()}
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -434,7 +437,7 @@ export default function ToolsPanel({ onClose, onOpenAssetExplorer, projectGalact
                         <h2>
                             <FaToolbox size={20} /> Tools
                         </h2>
-                        <button className="modal-close" onClick={onClose}>×</button>
+                        <button aria-label="Close" className="modal-close" onClick={onClose}>×</button>
                     </div>
 
                     <div className="modal-body">
@@ -491,7 +494,7 @@ export default function ToolsPanel({ onClose, onOpenAssetExplorer, projectGalact
                         <button
                             onClick={onClose}
                             className="btn-primary"
-                            style={{ padding: '0.4rem 1rem', fontSize: '0.9rem', minWidth: 'auto' }}
+                            style={{ padding: '0.4rem 1rem', fontSize: 'var(--fs-base)', minWidth: 'auto' }}
                         >
                             Close
                         </button>

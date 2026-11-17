@@ -2,7 +2,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
   color: var(--text-primary);
   cursor: pointer;
 }
@@ -24,7 +24,7 @@
 }
 
 .repakx-checkbox-control:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 20%);
+  outline: 2px solid color-mix(in srgb, var(--accent-primary), transparent 20%);
   outline-offset: 3px;
   border-radius: 4px;
 }
@@ -55,7 +55,7 @@
 }
 
 .repakx-checkbox:not(.disabled):hover .repakx-checkbox-box {
-  border-color: var(--accent-primary, #4a9eff);
+  border-color: var(--accent-primary);
   transform: scale(1.05);
 }
 
@@ -68,7 +68,7 @@
 .repakx-checkbox-icon {
   width: 14px;
   height: 14px;
-  color: #ffffff;
+  color: var(--on-accent);
   opacity: 0;
   transform: scale(0.5);
   transition:
@@ -124,49 +124,49 @@
 .repakx-checkbox.primary.checked .repakx-checkbox-box,
 .repakx-checkbox.primary.indeterminate .repakx-checkbox-box {
   background: linear-gradient(135deg,
-      var(--accent-primary, #4a9eff),
-      color-mix(in srgb, var(--accent-primary, #4a9eff), white 15%));
-  border-color: var(--accent-primary, #4a9eff);
+      var(--accent-primary),
+      color-mix(in srgb, var(--accent-primary), white 15%));
+  border-color: var(--accent-primary);
 }
 
 .repakx-checkbox.secondary.checked .repakx-checkbox-box,
 .repakx-checkbox.secondary.indeterminate .repakx-checkbox-box {
   background: linear-gradient(135deg,
-      var(--accent-secondary, #b245ff),
-      color-mix(in srgb, var(--accent-secondary, #b245ff), white 15%));
-  border-color: var(--accent-secondary, #b245ff);
+      var(--accent-secondary),
+      color-mix(in srgb, var(--accent-secondary), white 15%));
+  border-color: var(--accent-secondary);
 }
 
 .repakx-checkbox.success.checked .repakx-checkbox-box,
 .repakx-checkbox.success.indeterminate .repakx-checkbox-box {
   background: linear-gradient(135deg,
-      var(--success, #4CAF50),
-      color-mix(in srgb, var(--success, #4CAF50), white 15%));
-  border-color: var(--success, #4CAF50);
+      var(--success),
+      color-mix(in srgb, var(--success), white 15%));
+  border-color: var(--success);
 }
 
 .repakx-checkbox.warning.checked .repakx-checkbox-box,
 .repakx-checkbox.warning.indeterminate .repakx-checkbox-box {
   background: linear-gradient(135deg,
-      var(--warning, #ff9800),
-      color-mix(in srgb, var(--warning, #ff9800), white 15%));
-  border-color: var(--warning, #ff9800);
+      var(--warning),
+      color-mix(in srgb, var(--warning), white 15%));
+  border-color: var(--warning);
 }
 
 .repakx-checkbox.danger.checked .repakx-checkbox-box,
 .repakx-checkbox.danger.indeterminate .repakx-checkbox-box {
   background: linear-gradient(135deg,
-      var(--danger, #ff5252),
-      color-mix(in srgb, var(--danger, #ff5252), white 15%));
-  border-color: var(--danger, #ff5252);
+      var(--danger),
+      color-mix(in srgb, var(--danger), white 15%));
+  border-color: var(--danger);
 }
 
 .repakx-checkbox.default.checked .repakx-checkbox-box,
 .repakx-checkbox.default.indeterminate .repakx-checkbox-box {
   background: linear-gradient(135deg,
-      var(--text-secondary, #7a7a7a),
-      color-mix(in srgb, var(--text-secondary, #7a7a7a), white 20%));
-  border-color: var(--text-secondary, #7a7a7a);
+      var(--text-secondary),
+      color-mix(in srgb, var(--text-secondary), white 20%));
+  border-color: var(--text-secondary);
 }
 
 /* Active/Press Effect */

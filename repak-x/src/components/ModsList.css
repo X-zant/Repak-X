@@ -72,7 +72,7 @@
 }
 
 .mod-list-grid.view-compact .mod-name-button {
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
 }
 
 .mod-list-grid.view-compact .mod-tags-row {
@@ -82,7 +82,7 @@
 .mod-list-grid.view-compact .tag {
     height: 16px;
     padding: 0 4px;
-    font-size: 0.65rem;
+    font-size: var(--fs-xs);
 }
 
 .mod-list-grid.view-compact .mod-actions-row {
@@ -91,7 +91,7 @@
 }
 
 .mod-list-grid.view-compact .mod-size {
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
 }
 
 .mod-list-grid.view-compact .mod-hero-icon-badge {
@@ -162,7 +162,7 @@
 
 .mod-list-grid.view-list-compact .tag {
     height: 16px;
-    font-size: 0.65rem;
+    font-size: var(--fs-xs);
     padding: 0 4px;
 }
 
@@ -175,11 +175,11 @@
 }
 
 .mod-list-grid.view-list-compact .mod-name-button {
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
 }
 
 .mod-list-grid.view-list-compact .mod-size {
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     min-width: 48px;
 }
 
@@ -204,7 +204,7 @@
 
 /* --- Sleek Mod Card Design --- */
 .mod-card {
-    background: var(--card-bg, #0f1012);
+    background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 10px;
     padding: 12px;
@@ -444,7 +444,7 @@
     align-items: center;
     height: 22px;
     padding: 0 8px;
-    font-size: 0.65rem;
+    font-size: var(--fs-xs);
     font-weight: 600;
     letter-spacing: 0.03em;
     border-radius: 4px;
@@ -474,7 +474,7 @@
     background: transparent;
     border: none;
     color: var(--text-primary);
-    font-size: 0.95rem;
+    font-size: var(--fs-base);
     font-weight: 600;
     display: flex;
     align-items: center;
@@ -536,24 +536,24 @@
     min-width: 60px;
     max-width: 100%;
     padding: 2px 6px;
-    font-size: 0.95rem;
+    font-size: var(--fs-base);
     font-weight: 600;
     color: var(--text-primary);
-    background: var(--bg-dark, #1a1a1a);
+    background: var(--bg-dark);
     border: 1px solid var(--accent-primary);
     border-radius: 4px;
     outline: none;
-    box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.2), inset 0 1px 3px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary), transparent 80%), inset 0 1px 3px rgba(0, 0, 0, 0.3);
     transition: box-shadow 0.15s ease;
 }
 
 .mod-rename-input:focus {
-    box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.3), inset 0 1px 3px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary), transparent 70%), inset 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .mod-rename-input::selection {
     background: var(--accent-primary);
-    color: white;
+    color: var(--on-accent);
 }
 
 .mod-rename-suffix {
@@ -595,7 +595,7 @@
     border-radius: 4px;
     background: var(--tag-bg, rgba(255, 255, 255, 0.06));
     border: 1px solid var(--tag-border, rgba(255, 255, 255, 0.08));
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     color: var(--text-primary);
     font-weight: 500;
     line-height: 1;
@@ -609,8 +609,8 @@
 }
 
 .mod-card .tag svg {
-    font-size: 9px;
-    color: var(--accent-primary, #4a9eff);
+    font-size: var(--fs-xs);
+    color: var(--accent-primary);
 }
 
 /* Row 3: Actions */
@@ -631,7 +631,7 @@
 }
 
 .mod-size {
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     color: var(--text-secondary);
     min-width: 56px;
     text-align: right;
@@ -639,7 +639,7 @@
 
 /* Status Icons */
 .mod-status-icon {
-    font-size: 0.9rem;
+    font-size: var(--fs-base);
     opacity: 0.8;
 }
 
@@ -650,7 +650,7 @@
     justify-content: center;
     height: 100%;
     color: var(--text-secondary);
-    font-size: 1rem;
+    font-size: var(--fs-md);
     padding: 2rem;
     text-align: center;
 }

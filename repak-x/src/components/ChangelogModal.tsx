@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MdClose } from 'react-icons/md';
 import './ChangelogModal.css';
+import { useDialog } from '../hooks/useDialog'
 
 type ChangelogModalProps = {
     isOpen: boolean;
@@ -98,6 +99,7 @@ export default function ChangelogModal({
     changelog,
     onClose
 }: ChangelogModalProps) {
+    const dialog = useDialog(onClose, "What's new")
     const renderedContent = useMemo(() => {
         if (!changelog) return null;
         const parsed = parseChangelog(changelog);
@@ -117,15 +119,16 @@ export default function ChangelogModal({
                 onClick={onClose}
             >
                 <motion.div
-                    className="modal-content changelog-modal"
+                    {...dialog}
+                className="modal-content changelog-modal"
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.9, opacity: 0 }}
                     onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}
                 >
                     <div className="modal-header">
-                        <h2>📋 What's New in v{version}</h2>
-                        <button className="modal-close" onClick={onClose}>
+                        <h2>What's New in v{version}</h2>
+                        <button aria-label="Close" className="modal-close" onClick={onClose}>
                             <MdClose />
                         </button>
                     </div>

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { FaExchangeAlt } from 'react-icons/fa'
 import { IoWarningOutline } from 'react-icons/io5'
 import './UpdateModModal.css'
+import { useDialog } from '../hooks/useDialog'
 
 type ModRecord = {
     path: string
@@ -18,6 +19,7 @@ type UpdateModModalProps = {
 }
 
 export default function UpdateModModal({ isOpen, onClose, onConfirm, oldMod, newSourcePath }: UpdateModModalProps) {
+    const dialog = useDialog(onClose, 'Update mod')
     const [preserveName, setPreserveName] = useState(true)
     if (!isOpen || !oldMod) return null
 
@@ -35,7 +37,8 @@ export default function UpdateModModal({ isOpen, onClose, onConfirm, oldMod, new
             {isOpen && (
                 <div className="modal-overlay" onClick={onClose}>
                     <motion.div
-                        className="modal-content update-mod-modal"
+                        {...dialog}
+                className="modal-content update-mod-modal"
                         onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}

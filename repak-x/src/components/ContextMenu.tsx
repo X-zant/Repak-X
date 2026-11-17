@@ -104,7 +104,91 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
     setAdjustedPos(prev => (prev.x === newX && prev.y === newY ? prev : { x: newX, y: newY }))
   }, [x, y])
 
-  const handleDeleteDown = (e: React.MouseEvent) => {
+  // Keyboard: focus the first item on open, and give focus back to where it was
+  // when the menu closes (unless something else, like a rename modal, took it).
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null
+    const node = menuRef.current
+    if (node) levelItems(node)[0]?.focus()
+    return () => {
+      const active = document.activeElement
+      if (!active || active === document.body || node?.contains(active)) prev?.focus?.()
+    }
+  }, [])
+
+  const levelItems = (level: Element) =>
+    Array.from(level.querySelectorAll<HTMLElement>(':scope > .context-menu-item, :scope > .scrollable-menu-list > .context-menu-item'))
+      .filter(i => i.getAttribute('aria-disabled') !== 'true')
+
+  const openSubmenu = (trigger: HTMLElement) => {
+    trigger.classList.add('open')
+    handleSubmenuEnter({ currentTarget: trigger } as React.MouseEvent<HTMLDivElement>)
+    const sub = trigger.querySelector(':scope > .submenu')
+    if (sub) levelItems(sub)[0]?.focus()
+  }
+
+  const handleMenuKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Keep arrows/Enter/Escape away from App's global shortcuts (mod-list navigation)
+    e.stopPropagation()
+    if (e.key === 'Escape' || e.key === 'Tab') {
+      e.preventDefault()
+      onClose()
+      return
+    }
+    const item = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('.context-menu-item')
+    if (!item || !menuRef.current?.contains(item)) return
+    const level = item.parentElement!.closest('.submenu, .context-menu')!
+    const items = levelItems(level)
+    switch (e.key) {
+      case 'ArrowDown':
+      case 'ArrowUp': {
+        e.preventDefault()
+        items.forEach(i => i.classList.remove('open'))
+        const step = e.key === 'ArrowDown' ? 1 : -1
+        items[(items.indexOf(item) + step + items.length) % items.length]?.focus()
+        break
+      }
+      case 'Home':
+      case 'End':
+        e.preventDefault()
+        items[e.key === 'Home' ? 0 : items.length - 1]?.focus()
+        break
+      case 'ArrowRight':
+        if (item.classList.contains('submenu-trigger')) {
+          e.preventDefault()
+          openSubmenu(item)
+        }
+        break
+      case 'ArrowLeft': {
+        const trigger = level.closest<HTMLElement>('.submenu-trigger')
+        if (trigger) {
+          e.preventDefault()
+          trigger.classList.remove('open')
+          trigger.focus()
+        }
+        break
+      }
+      case 'Enter':
+      case ' ':
+        e.preventDefault()
+        if (item.classList.contains('submenu-trigger')) openSubmenu(item)
+        else if (item.classList.contains('danger')) { if (!e.repeat) handleDeleteDown(e) }
+        else item.click()
+        break
+      case 'Delete':
+        item.querySelector<HTMLElement>(':scope > .context-menu-item-delete')?.click()
+        break
+    }
+  }
+
+  // Hold-to-delete works with Enter/Space held down, same as the mouse button
+  const handleMenuKeyUp = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if ((e.key === 'Enter' || e.key === ' ') && (document.activeElement as HTMLElement | null)?.classList.contains('danger')) {
+      handleDeleteUp(e)
+    }
+  }
+
+  const handleDeleteDown = (e: React.SyntheticEvent) => {
     e.preventDefault()
     e.stopPropagation()
     if (!holdToDelete) {
@@ -119,7 +203,7 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
     }, 2000)
   }
 
-  const handleDeleteUp = (e: React.MouseEvent) => {
+  const handleDeleteUp = (e: React.SyntheticEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setIsDeleting(false)
@@ -191,9 +275,9 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
     // The root folder can't be renamed, moved, or deleted, so it only gets
     // the two actions that make sense for it.
     return (
-      <div ref={menuRef} className="context-menu" style={{ top: adjustedPos.y, left: adjustedPos.x }} onClick={(e) => e.stopPropagation()}>
+      <div ref={menuRef} role="menu" className="context-menu" style={{ top: adjustedPos.y, left: adjustedPos.x }} onClick={(e) => e.stopPropagation()} onKeyDown={handleMenuKeyDown} onKeyUp={handleMenuKeyUp}>
         <div className="context-menu-header">{folder.name}</div>
-        <div className="context-menu-item" onClick={async () => {
+        <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={async () => {
           try {
             // Root's id is its own folder name, which gamePath already ends with -
             // so gamePath itself is the root's path.
@@ -205,7 +289,7 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
         }}>
           Open in Explorer
         </div>
-        <div className="context-menu-item" onClick={async () => {
+        <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={async () => {
           onClose();
           try {
             await navigator.clipboard.writeText(gamePath || folder.id);
@@ -239,9 +323,9 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
     const canMoveToRoot = currentParentId !== null
 
     return (
-      <div ref={menuRef} className="context-menu" style={{ top: adjustedPos.y, left: adjustedPos.x }} onClick={(e) => e.stopPropagation()}>
+      <div ref={menuRef} role="menu" className="context-menu" style={{ top: adjustedPos.y, left: adjustedPos.x }} onClick={(e) => e.stopPropagation()} onKeyDown={handleMenuKeyDown} onKeyUp={handleMenuKeyUp}>
         <div className="context-menu-header">{folder.name}</div>
-        <div className="context-menu-item" onClick={async () => {
+        <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={async () => {
           try {
             // Construct full folder path from gamePath + folder.id
             const separator = gamePath?.includes('\\') ? '\\' : '/';
@@ -254,7 +338,7 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
         }}>
           Open in Explorer
         </div>
-        <div className="context-menu-item" onClick={async () => {
+        <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={async () => {
           onClose();
           try {
             // Construct full folder path from gamePath + folder.id
@@ -268,20 +352,20 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
           Copy Path
         </div>
         <div className="context-menu-separator" />
-        <div className="context-menu-item" onClick={() => { onCreateFolder({ parentId: folder.id }); onClose(); }}>
+        <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={() => { onCreateFolder({ parentId: folder.id }); onClose(); }}>
           + New Folder
         </div>
 
         {onMoveFolderTo && (
-          <div className="context-menu-item submenu-trigger" onMouseEnter={handleSubmenuEnter}>
+          <div role="menuitem" tabIndex={-1} className="context-menu-item submenu-trigger" onMouseEnter={handleSubmenuEnter}>
             Move to...
             <div className="submenu">
               {canMoveToRoot && (
-                <div className="context-menu-item" onClick={() => { onMoveFolderTo(null); onClose(); }}>
+                <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={() => { onMoveFolderTo(null); onClose(); }}>
                   Root ({rootFolder?.name || '~mods'})
                 </div>
               )}
-              <div className="context-menu-item" onClick={() => { onCreateFolder({ moveFolderId: folder.id }); onClose(); }}>
+              <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={() => { onCreateFolder({ moveFolderId: folder.id }); onClose(); }}>
                 + New Folder...
               </div>
               {moveCandidates.length > 0 && (
@@ -289,7 +373,7 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
                   <div className="context-menu-separator" />
                   <div className="scrollable-menu-list" style={{ maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
                     {moveCandidates.map(f => (
-                      <div key={f.id} className="context-menu-item" onClick={() => { onMoveFolderTo(f.id); onClose(); }}>
+                      <div key={f.id} role="menuitem" tabIndex={-1} className="context-menu-item" onClick={() => { onMoveFolderTo(f.id); onClose(); }}>
                         {f.id}
                       </div>
                     ))}
@@ -297,7 +381,7 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
                 </>
               )}
               {moveCandidates.length === 0 && !canMoveToRoot && (
-                <div className="context-menu-item" style={{ opacity: 0.5, cursor: 'default' }}>
+                <div role="menuitem" tabIndex={-1} aria-disabled="true" className="context-menu-item disabled">
                   No valid destinations
                 </div>
               )}
@@ -305,7 +389,7 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
           </div>
         )}
 
-        <div className="context-menu-item" onClick={(e) => {
+        <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={(e) => {
           e.stopPropagation();
           onRenameFolder();
           onClose();
@@ -314,6 +398,9 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
         </div>
         <div className="context-menu-separator" />
         <div
+          role="menuitem"
+          tabIndex={-1}
+          onBlur={handleDeleteUp}
           className={`context-menu-item danger ${isDeleting ? 'holding' : ''}`}
           onMouseDown={handleDeleteDown}
           onMouseUp={handleDeleteUp}
@@ -329,13 +416,13 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
   if (!mod) return null
 
   return (
-    <div ref={menuRef} className="context-menu" style={{ top: adjustedPos.y, left: adjustedPos.x }} onClick={(e) => e.stopPropagation()}>
+    <div ref={menuRef} role="menu" className="context-menu" style={{ top: adjustedPos.y, left: adjustedPos.x }} onClick={(e) => e.stopPropagation()} onKeyDown={handleMenuKeyDown} onKeyUp={handleMenuKeyUp}>
       <div className="context-menu-header">{mod.custom_name || mod.path.split(/[/\\]/).pop()}</div>
 
-      <div className="context-menu-item submenu-trigger" onMouseEnter={handleSubmenuEnter}>
+      <div role="menuitem" tabIndex={-1} className="context-menu-item submenu-trigger" onMouseEnter={handleSubmenuEnter}>
         Assign Tag...
         <div className="submenu">
-          <div className="context-menu-item" onClick={() => {
+          <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={() => {
             onNewTag((tag) => {
               if (tag) onAssignTag(tag);
             });
@@ -345,7 +432,7 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
           </div>
           {allTags && allTags.length > 0 && <div className="context-menu-separator" />}
           {allTags && allTags.map(tag => (
-            <div key={tag} className="context-menu-item" onClick={() => { onAssignTag(tag); onClose(); }}>
+            <div key={tag} role="menuitem" tabIndex={-1} className="context-menu-item" onClick={() => { onAssignTag(tag); onClose(); }}>
               <span className="context-menu-item-label">{tag}</span>
               {onDeleteTag && (
                 <button
@@ -355,7 +442,9 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
                     onDeleteTag(tag)
                     onClose()
                   }}
-                  title={`Delete "${tag}" tag`}
+                  title={`Delete "${tag}" tag (Del)`}
+                  aria-label={`Delete "${tag}" tag`}
+                  tabIndex={-1}
                 >
                   ×
                 </button>
@@ -365,22 +454,22 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
         </div>
       </div>
 
-      <div className="context-menu-item submenu-trigger" onMouseEnter={handleSubmenuEnter}>
+      <div role="menuitem" tabIndex={-1} className="context-menu-item submenu-trigger" onMouseEnter={handleSubmenuEnter}>
         {selectionCount > 1 ? `Move ${selectionCount} mods to...` : 'Move to...'}
         {/* Same order as the folder submenu above: root first, then New Folder,
             then the list. It used to trail the root entry after the list. */}
         <div className="submenu">
-          <div className="context-menu-item" onClick={() => { onMoveTo(null); onClose(); }}>
+          <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={() => { onMoveTo(null); onClose(); }}>
             Root ({folders.find(f => f.is_root)?.name || '~mods'})
           </div>
           {/* Inside "Move to...", creating a folder must also perform the move */}
-          <div className="context-menu-item" onClick={() => { onCreateFolder({ moveMods: true }); onClose(); }}>
+          <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={() => { onCreateFolder({ moveMods: true }); onClose(); }}>
             + New Folder...
           </div>
           <div className="context-menu-separator" />
           <div className="scrollable-menu-list" style={{ maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
             {folders.filter(f => !f.is_root).map(f => (
-              <div key={f.id} className="context-menu-item" onClick={() => { onMoveTo(f.id); onClose(); }}>
+              <div key={f.id} role="menuitem" tabIndex={-1} className="context-menu-item" onClick={() => { onMoveTo(f.id); onClose(); }}>
                 {f.name}
               </div>
             ))}
@@ -390,29 +479,32 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
 
       <div className="context-menu-separator" />
 
-      <div className="context-menu-item" onClick={() => { if (onCheckConflicts) onCheckConflicts(); onClose(); }}>
+      <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={() => { if (onCheckConflicts) onCheckConflicts(); onClose(); }}>
         Check Conflicts <IoLayersSharp className="warning-icon-small" style={{ fill: 'var(--accent-primary)' }} />
       </div>
 
-      <div className="context-menu-item" onClick={() => { if (onUpdateMod) onUpdateMod(); onClose(); }}>
+      <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={() => { if (onUpdateMod) onUpdateMod(); onClose(); }}>
         Update/Replace
       </div>
 
-      <div className="context-menu-item" onClick={() => { if (onSendToVfxUpdater) onSendToVfxUpdater(mod); onClose(); }}>
+      <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={() => { if (onSendToVfxUpdater) onSendToVfxUpdater(mod); onClose(); }}>
         Send to VFX Updater
       </div>
 
       <div className="context-menu-separator" />
 
-      <div className="context-menu-item" onClick={() => { onToggle(); onClose(); }}>
+      <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={() => { onToggle(); onClose(); }}>
         {mod.enabled ? 'Disable' : 'Enable'}
       </div>
 
-      <div className="context-menu-item" onClick={handleRenameClick}>
+      <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={handleRenameClick}>
         Rename
       </div>
 
       <div
+        role="menuitem"
+        tabIndex={-1}
+        onBlur={handleDeleteUp}
         className={`context-menu-item danger ${isDeleting ? 'holding' : ''}`}
         onMouseDown={handleDeleteDown}
         onMouseUp={handleDeleteUp}
@@ -425,17 +517,17 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
       <div className="context-menu-separator" />
 
       {onShowInAssetExplorer && (
-        <div className="context-menu-item" onClick={() => { onShowInAssetExplorer(mod); onClose(); }}>
+        <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={() => { onShowInAssetExplorer(mod); onClose(); }}>
           {selectionCount > 1 ? `Show ${selectionCount} mods in Asset Explorer` : 'Show in Asset Explorer'}
         </div>
       )}
-      <div className="context-menu-item" onClick={() => {
+      <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={() => {
         if (onExtractAssets) onExtractAssets(mod);
         onClose();
       }}>
         Extract Assets
       </div>
-      <div className="context-menu-item" onClick={async () => {
+      <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={async () => {
         try {
           await invoke('open_in_explorer', { path: mod.path });
         } catch (e) {
@@ -445,7 +537,7 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
       }}>
         Open in Explorer
       </div>
-      <div className="context-menu-item" onClick={async () => {
+      <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={async () => {
         try {
           await navigator.clipboard.writeText(mod.path);
         } catch (e) {

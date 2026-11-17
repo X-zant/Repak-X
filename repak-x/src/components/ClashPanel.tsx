@@ -10,6 +10,7 @@ import {
 import NumberInput from './ui/NumberInput'
 import Switch from './ui/Switch'
 import './ClashPanel.css'
+import { useDialog } from '../hooks/useDialog'
 
 type ClashRecord = {
     file_path: string
@@ -33,6 +34,7 @@ type ClashPanelProps = {
 const stemOf = (p: string) => p.replace(/\.(pak|bak_repak|pak_disabled)$/i, '')
 
 const ClashPanel = ({ clashes, mods = [], onSetPriority, onToggleMod, onClose }: ClashPanelProps) => {
+    const dialog = useDialog(onClose, 'Mod conflicts')
     // The list isn't recomputed on toggle, so entries can hold the pre-toggle
     // path; fall back to matching the extension-less path
     const { byPath, byStem } = useMemo(() => {
@@ -48,6 +50,7 @@ const ClashPanel = ({ clashes, mods = [], onSetPriority, onToggleMod, onClose }:
     return (
         <div className="modal-overlay clash-overlay" onClick={onClose}>
             <motion.div
+                {...dialog}
                 className="clash-panel-content"
                 onClick={e => e.stopPropagation()}
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -60,7 +63,7 @@ const ClashPanel = ({ clashes, mods = [], onSetPriority, onToggleMod, onClose }:
                         Mod Conflicts
                         {clashes.length > 0 && (
                             <span style={{
-                                fontSize: '0.85rem',
+                                fontSize: 'var(--fs-sm)',
                                 background: 'rgba(244, 67, 54, 0.1)',
                                 color: 'var(--danger)',
                                 padding: '2px 8px',
@@ -71,7 +74,7 @@ const ClashPanel = ({ clashes, mods = [], onSetPriority, onToggleMod, onClose }:
                             </span>
                         )}
                     </h2>
-                    <button className="close-icon-btn" onClick={onClose}>
+                    <button aria-label="Close" className="close-icon-btn" onClick={onClose}>
                         <Close fontSize="small" />
                     </button>
                 </div>

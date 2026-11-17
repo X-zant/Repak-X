@@ -66,11 +66,11 @@ export default function DiscordWidget() {
           />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '1rem', fontWeight: 700, color: '#f2f3f5' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 'var(--fs-md)', fontWeight: 700, color: '#f2f3f5' }}>
             <span>{serverName}</span>
             <CommunityBadge />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.8rem', color: '#b5bac1' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 'var(--fs-sm)', color: '#b5bac1' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#23a55a', flexShrink: 0 }} />
               {onlineCount} Online
@@ -86,7 +86,7 @@ export default function DiscordWidget() {
             borderRadius: 6,
             background: '#248046',
             color: '#fff',
-            fontSize: '0.85rem',
+            fontSize: 'var(--fs-sm)',
             fontWeight: 600,
             cursor: 'pointer',
             marginTop: 2,

@@ -1,6 +1,6 @@
 .folder-tree {
     font-family: inherit;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     color: var(--text-primary);
     user-select: none;
     padding: 0.5rem;
@@ -37,7 +37,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1rem;
+    font-size: var(--fs-md);
     flex-shrink: 0;
 }
 
@@ -68,9 +68,9 @@
 
 /* Specific styles for FolderTree that might differ from FileTree */
 .folder-tree .folder-count {
-    font-size: 0.75rem;
-    opacity: 0.6;
+    font-size: var(--fs-xs);
     margin-left: 8px;
+  color: var(--text-secondary);
 }
 
 .folder-tree .delete-folder {

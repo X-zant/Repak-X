@@ -79,21 +79,21 @@
 }
 
 .onboarding-tooltip-title {
-  font-size: 1rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 0.5rem 0;
 }
 
 .onboarding-tooltip-desc {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--text-secondary);
   line-height: 1.5;
   margin: 0;
 }
 
 .onboarding-step-counter {
-  font-size: 0.7rem;
+  font-size: var(--fs-xs);
   color: var(--text-secondary);
   text-align: center;
   padding: 0 1.25rem 0.75rem;
@@ -150,7 +150,7 @@
   background: none;
   border: none;
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
   padding: 4px 8px;
   border-radius: 4px;
@@ -166,7 +166,7 @@
   background: var(--bg-light);
   border: 1px solid var(--panel-border);
   color: var(--text-primary);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   padding: 6px 14px;
   border-radius: 6px;
   cursor: pointer;
@@ -180,8 +180,8 @@
 .onboarding-next-btn {
   background: var(--accent-gradient);
   border: 1px solid var(--accent-primary);
-  color: #ffffff;
-  font-size: 0.8rem;
+  color: var(--on-accent);
+  font-size: var(--fs-sm);
   font-weight: 600;
   padding: 6px 18px;
   border-radius: 6px;

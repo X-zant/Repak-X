@@ -35,8 +35,8 @@
 }
 
 .number-btn:hover:not(:disabled) {
-  background-color: var(--accent-primary, #4a9eff);
-  color: #fff;
+  background-color: var(--accent-primary);
+  color: var(--on-accent);
   transform: scale(1.1);
 }
 
@@ -71,5 +71,5 @@
 
 .number-display:focus {
   outline: none;
-  color: var(--accent-primary, #4a9eff);
+  color: var(--accent-primary);
 }

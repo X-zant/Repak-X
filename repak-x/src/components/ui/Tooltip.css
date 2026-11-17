@@ -10,7 +10,7 @@
   z-index: 1000;
   padding: 0.5rem 0.75rem;
   border-radius: 0.5rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-sm);
   line-height: 1.25rem;
   font-weight: 500;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 
@@ -67,7 +67,7 @@
 
 .repakx-tooltip-content.primary {
   background: linear-gradient(135deg, 
-    rgba(74, 158, 255, 0.95) 0%, 
+    color-mix(in srgb, var(--accent-primary), transparent 5%) 0%, 
     rgba(58, 134, 255, 0.95) 100%);
   color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -100,19 +100,19 @@
 /* Sizes */
 .repakx-tooltip-content.sm {
   padding: 0.35rem 0.6rem;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   line-height: 1.2;
 }
 
 .repakx-tooltip-content.md {
   padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-sm);
   line-height: 1.3;
 }
 
 .repakx-tooltip-content.lg {
   padding: 0.65rem 0.95rem;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
   line-height: 1.4;
 }
 
@@ -126,7 +126,7 @@
 /* Subtle glow effect for tooltips */
 [data-theme="dark"] .repakx-tooltip-content.primary {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 
-              0 4px 12px rgba(74, 158, 255, 0.3),
+              0 4px 12px color-mix(in srgb, var(--accent-primary), transparent 70%),
               0 0 0 1px rgba(255, 255, 255, 0.15);
 }
 

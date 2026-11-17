@@ -42,11 +42,11 @@
 
 .dropzone-card:hover,
 .dropzone-card.active {
-    border-color: var(--accent-primary, #4a9eff);
+    border-color: var(--accent-primary);
     background: var(--bg-lighter);
     box-shadow:
-        0 0 40px color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 85%),
-        inset 0 0 60px color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 95%);
+        0 0 40px color-mix(in srgb, var(--accent-primary), transparent 85%),
+        inset 0 0 60px color-mix(in srgb, var(--accent-primary), transparent 95%);
 }
 
 .dropzone-card.active {
@@ -57,7 +57,7 @@
 /* Zone Icon */
 .zone-icon {
     font-size: 4rem;
-    color: var(--accent-primary, #4a9eff);
+    color: var(--accent-primary);
     margin-bottom: 1rem;
     opacity: 0.8;
     transition: all 0.25s ease;
@@ -70,14 +70,14 @@
 
 /* Zone Text */
 .dropzone-card h2 {
-    font-size: 1.5rem;
+    font-size: var(--fs-xl);
     font-weight: 600;
     margin: 0 0 0.5rem 0;
     color: var(--text-primary);
 }
 
 .dropzone-card p {
-    font-size: 0.9rem;
+    font-size: var(--fs-base);
     color: var(--text-secondary);
     text-align: center;
     margin: 0 0 1rem 0;
@@ -85,7 +85,7 @@
 }
 
 .zone-hint {
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     color: var(--text-secondary);
     opacity: 0.7;
     padding: 0.5rem 1rem;
@@ -119,26 +119,26 @@
     padding: 0.75rem 1rem;
     margin-bottom: 0.5rem;
     border-radius: 8px;
-    border: 2px dashed color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 50%);
-    background: color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 95%);
+    border: 2px dashed color-mix(in srgb, var(--accent-primary), transparent 50%);
+    background: color-mix(in srgb, var(--accent-primary), transparent 95%);
     color: var(--text-secondary);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     font-weight: 500;
     transition: all 0.2s ease;
 }
 
 .new-folder-drop-target svg {
-    font-size: 1.2rem;
-    color: var(--accent-primary, #4a9eff);
+    font-size: var(--fs-lg);
+    color: var(--accent-primary);
 }
 
 .new-folder-drop-target.active {
-    border-color: var(--accent-primary, #4a9eff);
+    border-color: var(--accent-primary);
     border-style: solid;
-    background: color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 80%);
-    color: var(--accent-primary, #4a9eff);
+    background: color-mix(in srgb, var(--accent-primary), transparent 80%);
+    color: var(--accent-primary);
     transform: scale(1.02);
-    box-shadow: 0 0 20px color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 70%);
+    box-shadow: 0 0 20px color-mix(in srgb, var(--accent-primary), transparent 70%);
 }
 
 /* Folder Tree Wrapper */
@@ -209,7 +209,7 @@
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.15s ease;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     color: var(--text-primary);
 }
 
@@ -218,8 +218,8 @@
 }
 
 .drop-folder-item.selected {
-    background: color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 75%);
-    color: var(--accent-primary, #4a9eff);
+    background: color-mix(in srgb, var(--accent-primary), transparent 75%);
+    color: var(--accent-primary);
 }
 
 .drop-folder-item.virtual {
@@ -231,13 +231,13 @@
     align-items: center;
     justify-content: center;
     width: 16px;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     opacity: 0.6;
 }
 
 .drop-folder-item .folder-icon {
-    font-size: 1rem;
-    color: var(--accent-primary, #4a9eff);
+    font-size: var(--fs-md);
+    color: var(--accent-primary);
 }
 
 .drop-folder-item .folder-name {
@@ -256,10 +256,10 @@
 .selected-folder-hint {
     margin-top: 1rem;
     padding: 0.75rem 1rem;
-    background: color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 85%);
-    border: 1px solid color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 70%);
+    background: color-mix(in srgb, var(--accent-primary), transparent 85%);
+    border: 1px solid color-mix(in srgb, var(--accent-primary), transparent 70%);
     border-radius: 8px;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     color: var(--text-primary);
     text-align: center;
     flex-shrink: 0;
@@ -317,13 +317,13 @@
 
     0%,
     100% {
-        box-shadow: 0 0 0 color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 100%);
-        border-color: color-mix(in srgb, var(--accent-primary, #4a9eff), var(--panel-border) 65%);
+        box-shadow: 0 0 0 color-mix(in srgb, var(--accent-primary), transparent 100%);
+        border-color: color-mix(in srgb, var(--accent-primary), var(--panel-border) 65%);
     }
 
     50% {
-        box-shadow: 0 0 36px color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 80%);
-        border-color: color-mix(in srgb, var(--accent-primary, #4a9eff), var(--panel-border) 20%);
+        box-shadow: 0 0 36px color-mix(in srgb, var(--accent-primary), transparent 80%);
+        border-color: color-mix(in srgb, var(--accent-primary), var(--panel-border) 20%);
     }
 }
 
@@ -369,11 +369,11 @@
     background:
         linear-gradient(var(--bg-lighter), var(--bg-lighter)) padding-box,
         conic-gradient(from var(--dz-angle),
-            var(--accent-primary, #4a9eff),
-            color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 85%) 25%,
-            var(--accent-primary, #4a9eff) 50%,
-            color-mix(in srgb, var(--accent-primary, #4a9eff), transparent 85%) 75%,
-            var(--accent-primary, #4a9eff)) border-box;
+            var(--accent-primary),
+            color-mix(in srgb, var(--accent-primary), transparent 85%) 25%,
+            var(--accent-primary) 50%,
+            color-mix(in srgb, var(--accent-primary), transparent 85%) 75%,
+            var(--accent-primary)) border-box;
     animation: dropzone-border-spin 7.4s linear infinite;
 }
 

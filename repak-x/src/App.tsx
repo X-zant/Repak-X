@@ -4063,14 +4063,14 @@ function App() {
                 setSortDirection(newSortDir as 'asc' | 'desc');
               }}
               placeholder="Sort By"
-              icon={<FaSort style={{ fontSize: '1.2rem', opacity: 1, color: 'var(--accent-primary)' }} />}
+              icon={<FaSort style={{ fontSize: 'var(--fs-lg)', opacity: 1, color: 'var(--accent-primary)' }} />}
             />
             <CustomDropdown
               options={[{ value: '', label: 'View All' }, ...allTags]}
               value={filterTag}
               onChange={setFilterTag}
               placeholder="All Tags"
-              icon={<FaTag style={{ fontSize: '1.2rem', opacity: 1, color: 'var(--accent-primary)' }} />}
+              icon={<FaTag style={{ fontSize: 'var(--fs-lg)', opacity: 1, color: 'var(--accent-primary)' }} />}
               onAddNew={() => setNewTagPrompt({
                 callback: async (tag) => {
                   const trimmed = tag.trim()
@@ -4323,7 +4323,7 @@ function App() {
                 <div className="bulk-controls">
                   <div className="bulk-field" title="Move selected mods to a folder">
                     <CustomDropdown
-                      icon={<MdDriveFileMoveOutline style={{ fontSize: '1rem', opacity: 0.7 }} />}
+                      icon={<MdDriveFileMoveOutline style={{ fontSize: 'var(--fs-md)', opacity: 0.7 }} />}
                       options={[
                         { value: 'root', label: 'Root (~mods)' }, // Option to move back to root
                         ...folders.filter(f => f.name !== '~mods').map(f => ({ value: f.id, label: f.name }))
@@ -4341,7 +4341,7 @@ function App() {
 
                   <div className="bulk-field" title="Add or remove tags on selected mods">
                     <CustomDropdown
-                      icon={<FaTag style={{ fontSize: '1rem', opacity: 0.7 }} />}
+                      icon={<FaTag style={{ fontSize: 'var(--fs-md)', opacity: 0.7 }} />}
                       options={allTags.map(t => {
                         const isApplied = mods.some(m => selectedMods.has(m.path) && toTagArray(m.custom_tags).includes(t));
                         return { value: t, label: t, showDelete: isApplied };

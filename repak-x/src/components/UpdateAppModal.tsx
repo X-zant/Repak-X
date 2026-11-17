@@ -1,7 +1,8 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MdDownload, MdOpenInNew, MdClose } from 'react-icons/md';
+import { MdDownload, MdOpenInNew, MdClose, MdCheckCircle } from 'react-icons/md';
 import './UpdateAppModal.css';
+import { useDialog } from '../hooks/useDialog'
 
 type UpdateInfo = {
     latest?: string;
@@ -76,7 +77,7 @@ function renderChangelogBlocks(raw: string): React.ReactNode {
                                 width: '5px',
                                 height: '5px',
                                 borderRadius: '50%',
-                                background: 'var(--accent-primary, #4a9eff)'
+                                background: 'var(--accent-primary)'
                             }}
                         />
                         {renderInlineMarkdown(item)}
@@ -96,13 +97,13 @@ function renderChangelogBlocks(raw: string): React.ReactNode {
         flushList();
         if (block.type === 'heading') {
             elements.push(
-                <h3 key={key++} style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0.7rem 0 0.25rem 0' }}>
+                <h3 key={key++} style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: 'var(--text-primary)', margin: '0.7rem 0 0.25rem 0' }}>
                     {renderInlineMarkdown(block.text)}
                 </h3>
             );
         } else {
             elements.push(
-                <p key={key++} style={{ fontSize: '0.9rem', lineHeight: 1.5, color: 'var(--text-secondary)', margin: '0.25rem 0' }}>
+                <p key={key++} style={{ fontSize: 'var(--fs-base)', lineHeight: 1.5, color: 'var(--text-secondary)', margin: '0.25rem 0' }}>
                     {renderInlineMarkdown(block.text)}
                 </p>
             );
@@ -135,6 +136,7 @@ export default function UpdateAppModal({
     onOpenReleasePage,
     onClose
 }: UpdateAppModalProps) {
+    const dialog = useDialog(onClose, 'Update available')
     if (!isOpen || !updateInfo) return null;
 
     const isDownloading = downloadProgress?.status === 'downloading';
@@ -151,15 +153,16 @@ export default function UpdateAppModal({
                 onClick={onClose}
             >
                 <motion.div
-                    className="modal-content update-modal"
+                    {...dialog}
+                className="modal-content update-modal"
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.9, opacity: 0 }}
                     onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}
                 >
                     <div className="modal-header">
-                        <h2>🎉 Update Available!</h2>
-                        <button className="modal-close" onClick={onClose}>
+                        <h2>Update Available</h2>
+                        <button aria-label="Close" className="modal-close" onClick={onClose}>
                             <MdClose />
                         </button>
                     </div>
@@ -191,7 +194,7 @@ export default function UpdateAppModal({
 
                         {isReady && (
                             <p className="update-ready">
-                                ✅ Download complete! Click "Install & Restart" to apply the update.
+                                <MdCheckCircle aria-hidden="true" /> Download complete. Click "Install & Restart" to apply the update.
                             </p>
                         )}
                     </div>

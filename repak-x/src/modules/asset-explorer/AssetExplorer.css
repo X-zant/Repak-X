@@ -71,7 +71,7 @@
     left: 0.6rem;
     color: var(--text-secondary);
     pointer-events: none;
-    font-size: 0.9rem;
+    font-size: var(--fs-base);
 }
 
 .ae-search input {
@@ -81,7 +81,7 @@
     border: 1px solid var(--input-border);
     background: var(--input-bg);
     color: var(--text-primary);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     outline: none;
     transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
@@ -127,7 +127,7 @@
     border-radius: 5px;
     background: transparent;
     color: var(--text-secondary);
-    font-size: 0.78rem;
+    font-size: var(--fs-xs);
     font-weight: 600;
     cursor: pointer;
     transition: background 0.16s ease, color 0.16s ease;
@@ -168,7 +168,7 @@
     background: transparent;
     color: var(--text-secondary);
     cursor: pointer;
-    font-size: 0.95rem;
+    font-size: var(--fs-base);
     transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
 }
 
@@ -183,7 +183,7 @@
 }
 
 .ae-export-caret {
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     opacity: 0.7;
 }
 
@@ -225,7 +225,7 @@
     border-radius: 5px;
     background: transparent;
     color: var(--text-primary);
-    font-size: 0.82rem;
+    font-size: var(--fs-sm);
     cursor: pointer;
 }
 
@@ -298,7 +298,7 @@
     border: 1px solid var(--panel-border);
     background: var(--bg-dark);
     color: var(--text-secondary);
-    font-size: 0.74rem;
+    font-size: var(--fs-xs);
     font-weight: 600;
     cursor: pointer;
     transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
@@ -316,9 +316,9 @@
 }
 
 .ae-filter-count {
-    opacity: 0.6;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
 }
 
 /* Never squeezed: the rail beside it is what gives way. */
@@ -343,7 +343,7 @@
 }
 
 .ae-toggle .repakx-checkbox-label {
-    font-size: 0.76rem;
+    font-size: var(--fs-xs);
     font-weight: 500;
     color: var(--text-secondary);
     transition: color 0.16s ease;
@@ -357,7 +357,7 @@
     border: none;
     background: none;
     color: var(--accent-primary);
-    font-size: 0.76rem;
+    font-size: var(--fs-xs);
     font-weight: 600;
     cursor: pointer;
     padding: 0.2rem 0.3rem;
@@ -383,7 +383,7 @@
     border: 1px solid var(--panel-border);
     background: var(--bg-dark);
     color: var(--text-secondary);
-    font-size: 0.76rem;
+    font-size: var(--fs-xs);
     font-weight: 600;
     cursor: pointer;
 }
@@ -399,7 +399,7 @@
 
 .ae-select-caret {
     transition: transform 0.16s ease;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
 }
 
 .ae-select-caret.is-open {
@@ -434,7 +434,7 @@
     border: none;
     background: transparent;
     color: var(--text-primary);
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     outline: none;
 }
 
@@ -472,7 +472,7 @@
     gap: 7px;
     flex: 1;
     min-width: 0;
-    font-size: 0.79rem;
+    font-size: var(--fs-sm);
     font-weight: 500;
 }
 
@@ -486,7 +486,7 @@
 .ae-mod-menu-clear {
     padding: 0.6rem;
     text-align: center;
-    font-size: 0.78rem;
+    font-size: var(--fs-xs);
     color: var(--text-secondary);
 }
 
@@ -532,7 +532,7 @@
     padding: 2rem;
     text-align: center;
     color: var(--text-secondary);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
 }
 
 /* ------------------------------------------------------------------- rows */
@@ -542,7 +542,7 @@
     align-items: center;
     gap: 6px;
     padding-right: 10px;
-    font-size: 0.79rem;
+    font-size: var(--fs-sm);
     cursor: default;
     user-select: none;
     position: relative;
@@ -603,12 +603,12 @@
     width: 14px;
     flex-shrink: 0;
     color: var(--text-secondary);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
 }
 
 .ae-icon {
     flex-shrink: 0;
-    font-size: 0.9rem;
+    font-size: var(--fs-base);
 }
 
 .ae-icon-folder {
@@ -634,7 +634,7 @@
 
 .ae-meta {
     flex-shrink: 0;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     font-weight: 500;
     color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
@@ -642,7 +642,7 @@
 }
 
 .ae-meta-dim {
-    opacity: 0.55;
+  color: var(--text-secondary);
 }
 
 .ae-conflict-count,
@@ -652,7 +652,7 @@
     gap: 3px;
     flex-shrink: 0;
     color: var(--danger);
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     font-weight: 700;
     font-variant-numeric: tabular-nums;
 }
@@ -666,7 +666,7 @@
     flex-shrink: 0;
     padding: 0.08rem 0.4rem;
     border-radius: 4px;
-    font-size: 0.68rem;
+    font-size: var(--fs-xs);
     font-weight: 600;
     border: 1px solid transparent;
     max-width: 190px;
@@ -750,7 +750,7 @@
     border-radius: 4px;
     background: var(--accent-primary);
     color: var(--btn-text);
-    font-size: 0.68rem;
+    font-size: var(--fs-xs);
     font-weight: 600;
     pointer-events: none;
 }
@@ -782,7 +782,7 @@
 
 .ae-detail-header h3 {
     margin: 0;
-    font-size: 0.78rem;
+    font-size: var(--fs-xs);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--text-secondary);
@@ -790,14 +790,14 @@
 
 .ae-detail-section h4 {
     margin: 0 0 0.35rem;
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--text-secondary);
 }
 
 .ae-detail-name {
-    font-size: 0.95rem;
+    font-size: var(--fs-base);
     font-weight: 700;
     word-break: break-all;
     color: var(--text-primary);
@@ -805,7 +805,7 @@
 
 .ae-detail-path {
     margin-top: 0.2rem;
-    font-size: 0.72rem;
+    font-size: var(--fs-xs);
     color: var(--text-secondary);
     word-break: break-all;
     line-height: 1.4;
@@ -820,7 +820,7 @@
 
 .ae-detail-hint {
     margin: 0 0 0.45rem;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     color: var(--text-secondary);
     opacity: 0.75;
 }
@@ -841,7 +841,7 @@
     border: 1px solid var(--panel-border);
     background: var(--bg-dark);
     color: var(--text-primary);
-    font-size: 0.78rem;
+    font-size: var(--fs-xs);
     text-align: left;
     cursor: pointer;
     transition: border-color 0.16s ease, background 0.16s ease;
@@ -866,7 +866,7 @@
 
 .ae-owner-meta {
     flex-shrink: 0;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     font-weight: 600;
     color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
@@ -876,7 +876,7 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 0.78rem;
+    font-size: var(--fs-xs);
 }
 
 .ae-detail-rows > div {
@@ -908,7 +908,7 @@
     white-space: nowrap;
     border-top: 1px solid var(--panel-border);
     background: var(--status-bar-bg);
-    font-size: 0.72rem;
+    font-size: var(--fs-xs);
     color: var(--text-secondary);
     flex-shrink: 0;
 }
@@ -919,7 +919,7 @@
 }
 
 .ae-status-dim {
-    opacity: 0.6;
+  color: var(--text-secondary);
 }
 
 .ae-status-sep {
@@ -940,7 +940,7 @@
     border: none;
     background: none;
     color: var(--danger);
-    font-size: 0.72rem;
+    font-size: var(--fs-xs);
     /* No vertical padding: the bar is height-pinned, so any would only crop. */
     line-height: 1;
     cursor: pointer;
@@ -973,7 +973,7 @@
     justify-content: center;
     gap: 0.75rem;
     color: var(--text-secondary);
-    font-size: 0.88rem;
+    font-size: var(--fs-sm);
     padding: 2rem;
     text-align: center;
 }
@@ -985,7 +985,7 @@
 
 .ae-state-detail {
     max-width: 460px;
-    font-size: 0.78rem;
+    font-size: var(--fs-xs);
     word-break: break-word;
 }
 
@@ -1017,7 +1017,7 @@
     background: var(--bg-light);
     border: 1px solid var(--panel-border);
     color: var(--text-primary);
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
     z-index: 60;

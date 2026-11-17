@@ -2,7 +2,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
   color: var(--text-primary);
 }
 
@@ -23,7 +23,7 @@
 }
 
 .repakx-switch-control:focus-visible {
-  outline: 2px solid rgba(74, 158, 255, 0.8);
+  outline: 2px solid color-mix(in srgb, var(--accent-primary), transparent 20%);
   outline-offset: 3px;
   border-radius: 999px;
 }
@@ -45,7 +45,7 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--switch-thumb, var(--bg-lighter, #ffffff));
+  background: var(--switch-thumb, var(--bg-lighter));
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
   transition:
     transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
@@ -57,7 +57,7 @@
 }
 
 .repakx-switch.disabled .repakx-switch-thumb {
-  background: color-mix(in srgb, var(--bg-lighter, #ffffff), var(--bg-darkest, #0b0f19) 25%);
+  background: color-mix(in srgb, var(--bg-lighter), var(--bg-darkest) 25%);
   box-shadow: none;
 }
 
@@ -109,48 +109,48 @@
 .repakx-switch.primary.checked .repakx-switch-track {
   background: linear-gradient(
     120deg,
-    var(--accent-primary, #4a9eff),
-    color-mix(in srgb, var(--accent-primary, #4a9eff), white 25%)
+    var(--accent-primary),
+    color-mix(in srgb, var(--accent-primary), white 25%)
   );
 }
 
 .repakx-switch.secondary.checked .repakx-switch-track {
   background: linear-gradient(
     120deg,
-    var(--accent-secondary, #b245ff),
-    color-mix(in srgb, var(--accent-secondary, #b245ff), white 25%)
+    var(--accent-secondary),
+    color-mix(in srgb, var(--accent-secondary), white 25%)
   );
 }
 
 .repakx-switch.success.checked .repakx-switch-track {
   background: linear-gradient(
     120deg,
-    var(--success, #00c795),
-    color-mix(in srgb, var(--success, #00c795), white 25%)
+    var(--success),
+    color-mix(in srgb, var(--success), white 25%)
   );
 }
 
 .repakx-switch.warning.checked .repakx-switch-track {
   background: linear-gradient(
     120deg,
-    var(--warning, #ff8f2f),
-    color-mix(in srgb, var(--warning, #ff8f2f), white 25%)
+    var(--warning),
+    color-mix(in srgb, var(--warning), white 25%)
   );
 }
 
 .repakx-switch.danger.checked .repakx-switch-track {
   background: linear-gradient(
     120deg,
-    var(--danger, #ff5f6d),
-    color-mix(in srgb, var(--danger, #ff5f6d), white 25%)
+    var(--danger),
+    color-mix(in srgb, var(--danger), white 25%)
   );
 }
 
 .repakx-switch.default.checked .repakx-switch-track {
   background: linear-gradient(
     120deg,
-    var(--text-secondary, #7a7a7a),
-    color-mix(in srgb, var(--text-secondary, #7a7a7a), white 30%)
+    var(--text-secondary),
+    color-mix(in srgb, var(--text-secondary), white 30%)
   );
 }
 
@@ -164,7 +164,7 @@
   height: 12px;
   border-radius: 50%;
   border: 2px solid transparent;
-  border-top-color: var(--switch-spinner, color-mix(in srgb, var(--accent-primary, #4a9eff), white 40%));
+  border-top-color: var(--switch-spinner, color-mix(in srgb, var(--accent-primary), white 40%));
   animation: repakx-switch-spin 0.85s linear infinite;
 }
 

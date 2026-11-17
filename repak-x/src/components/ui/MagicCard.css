@@ -1,7 +1,7 @@
 .magic-card {
   position: relative;
   overflow: hidden;
-  background: var(--card-bg, #171717);
+  background: var(--card-bg);
   border: 1px solid var(--card-border, rgba(255, 255, 255, 0.1));
   border-radius: var(--card-radius, 12px);
 }

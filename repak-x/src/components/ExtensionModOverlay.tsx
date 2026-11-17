@@ -5,6 +5,7 @@ import { VscFolder, VscFolderOpened, VscChevronRight, VscChevronDown, VscClose, 
 import { MdExtension, MdCreateNewFolder, MdDriveFileMoveOutline } from 'react-icons/md';
 import { getHeroImageById, useHeroImages } from '../utils/heroImages';
 import './ExtensionModOverlay.css';
+import { useDialog } from '../hooks/useDialog'
 
 /** One installable mod found inside the incoming archive. */
 type ArchiveModEntry = {
@@ -187,6 +188,7 @@ const ExtensionModOverlay = ({
     onCreateFolder,
     onNewFolder
 }: ExtensionModOverlayProps) => {
+    const dialog = useDialog(onCancel, 'Mod from Repak X Extension')
     const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
     const [isInstalling, setIsInstalling] = useState(false);
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
@@ -386,7 +388,8 @@ const ExtensionModOverlay = ({
                     onClick={handleBackdropClick}
                 >
                     <motion.div
-                        className="extension-panel"
+                        {...dialog}
+                className="extension-panel"
                         initial={{ y: 50, opacity: 0, scale: 0.95 }}
                         animate={{ y: 0, opacity: 1, scale: 1 }}
                         exit={{ y: 50, opacity: 0, scale: 0.95 }}
@@ -401,7 +404,7 @@ const ExtensionModOverlay = ({
                                 <h2>Mod from Repak X Extension</h2>
                                 <p className="file-name" title={filePath ?? undefined}>{fileName}</p>
                             </div>
-                            <button className="close-btn" onClick={onCancel}>
+                            <button aria-label="Close" className="close-btn" onClick={onCancel}>
                                 <VscClose />
                             </button>
                         </div>

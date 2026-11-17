@@ -16,7 +16,7 @@
 }
 
 .details-header h2.mod-title {
-  font-size: 1rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   margin: 0;
   white-space: nowrap;
@@ -54,7 +54,7 @@
 .close-btn {
   background: transparent;
   border: none;
-  font-size: 1.5rem;
+  font-size: var(--fs-xl);
   color: #999;
   cursor: pointer;
   padding: 0;
@@ -80,7 +80,7 @@
 }
 
 .detail-section h3 {
-  font-size: 0.875rem;
+  font-size: var(--fs-sm);
   color: #999;
   margin-bottom: 0.75rem;
   text-transform: uppercase;
@@ -100,7 +100,7 @@
 
 .copy-paths-btn {
   padding: 0.35rem 0.65rem;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   background: var(--bg-light);
   border: 1px solid var(--panel-border);
   color: var(--text-primary);
@@ -119,14 +119,14 @@
   align-items: center;
   justify-content: center;
   padding: 0.5rem;
-  font-size: 1.1rem;
+  font-size: var(--fs-md);
 }
 
 .detail-item {
   display: flex;
   justify-content: space-between;
   padding: 0.5rem 0;
-  font-size: 0.875rem;
+  font-size: var(--fs-sm);
 }
 
 .detail-label {
@@ -152,8 +152,8 @@
 }
 
 .hero-tag {
-  background: rgba(74, 158, 255, 0.15);
-  border: 1px solid rgba(74, 158, 255, 0.3);
+  background: color-mix(in srgb, var(--accent-primary), transparent 85%);
+  border: 1px solid color-mix(in srgb, var(--accent-primary), transparent 70%);
   color: var(--text-primary) !important;
   font-size: 0.85em;
   padding: 4px 8px 4px 6px;
@@ -171,7 +171,7 @@
 
 .character-badge.multi-hero {
   cursor: help;
-  border: 1px solid #4a9eff;
+  border: 1px solid var(--accent-primary);
 }
 
 /* New classes for inline styles */
@@ -195,7 +195,7 @@
 /* Tooltip styles */
 .multi-hero-tooltip {
   background-color: var(--panel-bg) !important;
-  border: 1px solid rgba(74, 158, 255, 0.3) !important;
+  border: 1px solid color-mix(in srgb, var(--accent-primary), transparent 70%) !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
   max-width: 400px !important;
   padding: 0 !important;
@@ -224,7 +224,7 @@
   gap: 4px;
   padding: 8px 12px;
   color: var(--text-primary);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 .details-panel .file-list-container {

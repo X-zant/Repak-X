@@ -9,6 +9,7 @@ import { MdCreateNewFolder } from 'react-icons/md'
 import './InstallModPanel.css'
 import characterData from '../data/character_data.json'
 import { resolveHeroImage, useHeroImages } from '../utils/heroImages'
+import { useDialog } from '../hooks/useDialog'
 
 type FolderRecord = {
   id: string
@@ -219,6 +220,7 @@ function parseModType(modType: string | undefined): { character: string | null; 
 }
 
 export default function InstallModPanel({ mods, allTags, folders = [], currentFolderId, onCreateTag, onDeleteTag, onCreateFolder, onInstall, onCancel, onNewTag, onNewFolder, onMergeHybrid }: InstallModPanelProps) {
+  const dialog = useDialog(onCancel, 'Install mods')
   // Repaint when the synced hero portraits finish loading.
   useHeroImages()
   const [openDropdown, setOpenDropdown] = useState<number | null>(null)
@@ -357,14 +359,15 @@ export default function InstallModPanel({ mods, allTags, folders = [], currentFo
   return (
     <div className="install-mod-overlay">
       <motion.div
-        className="install-mod-panel"
+        {...dialog}
+                className="install-mod-panel"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.15 }}
       >
         <div className="install-header">
           <h2>Install Mods</h2>
-          <button className="close-btn" onClick={onCancel}>×</button>
+          <button aria-label="Close" className="close-btn" onClick={onCancel}>×</button>
         </div>
 
         {/* Mod Cards */}

@@ -80,7 +80,7 @@
   border-radius: 6px;
   color: var(--text-secondary);
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   font-weight: 500;
   text-align: left;
   cursor: pointer;
@@ -168,7 +168,7 @@
 .setting-subtext {
   margin: 0;
   padding-left: var(--setting-indent);
-  font-size: 0.825rem;
+  font-size: var(--fs-sm);
   line-height: 1.45;
   color: var(--text-secondary);
 }
@@ -184,7 +184,7 @@
 /* Description under a section title (not tied to a control) */
 .setting-hint {
   margin: 0 0 0.25rem;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   line-height: 1.45;
   color: var(--text-secondary);
 }
@@ -196,7 +196,7 @@
 }
 
 .settings-content .repakx-checkbox-label {
-  font-size: 0.925rem;
+  font-size: var(--fs-base);
   font-weight: 400;
   line-height: var(--setting-control-size);
   opacity: 0.9;
@@ -214,7 +214,7 @@
   display: flex;
   align-items: center;
   gap: var(--setting-control-gap);
-  font-size: 0.925rem;
+  font-size: var(--fs-base);
   line-height: var(--setting-control-size);
   opacity: 0.9;
 }
@@ -296,7 +296,7 @@
 .modal-header h2 {
   margin: 0;
   color: var(--text-primary);
-  font-size: 1.25rem;
+  font-size: var(--fs-lg);
   font-weight: 600;
 }
 
@@ -304,7 +304,7 @@
   background: transparent;
   border: none;
   color: var(--text-secondary);
-  font-size: 1.5rem;
+  font-size: var(--fs-xl);
   cursor: pointer;
   padding: 0.25rem;
   width: 32px;
@@ -340,7 +340,7 @@
 
 .setting-section h3 {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--accent-primary);
@@ -356,14 +356,14 @@
 
 .setting-group label {
   color: var(--text-primary);
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
   font-weight: 500;
 }
 
 .setting-description {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   line-height: 1.5;
 }
 
@@ -377,7 +377,7 @@
   color: var(--text-primary);
   border-radius: 6px;
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   transition: border-color 0.2s;
 }
 
@@ -412,7 +412,7 @@
   color: var(--text-primary);
   padding: 4px 12px;
   font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   outline: none !important;
   min-width: 0;
   /* Crucial for text truncation */
@@ -434,7 +434,7 @@
   border: 1px solid transparent;
   border-radius: 6px;
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -476,10 +476,10 @@
 .btn-primary {
   padding: 0.5rem 1.25rem;
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--on-accent);
   border: 1px solid transparent;
   border-radius: 6px;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -497,7 +497,7 @@
   border: 1px solid var(--panel-border);
   border-radius: 6px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   font-weight: 500;
   transition: all 0.2s;
 }
@@ -592,7 +592,7 @@
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-secondary);
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
   padding: 8px 16px;
   border-radius: 6px;
   cursor: pointer;

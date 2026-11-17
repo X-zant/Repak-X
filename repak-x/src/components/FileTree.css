@@ -1,6 +1,6 @@
 .file-tree {
   font-family: inherit;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--text-primary);
   user-select: none;
   padding: 0.5rem;
@@ -27,7 +27,7 @@
 }
 
 .node-content.selected {
-  background-color: rgba(74, 158, 255, 0.15);
+  background-color: color-mix(in srgb, var(--accent-primary), transparent 85%);
   color: var(--accent-primary);
 }
 
@@ -35,7 +35,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
+  font-size: var(--fs-md);
   flex-shrink: 0;
 }
 
@@ -59,10 +59,10 @@
   position: absolute;
   right: 8px;
   background: var(--accent-primary);
-  color: white;
+  color: var(--on-accent);
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: 0.7rem;
+  font-size: var(--fs-xs);
   white-space: nowrap;
   pointer-events: none;
   animation: fadeInOut 1.5s ease-in-out;

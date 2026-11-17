@@ -72,7 +72,7 @@
     background: transparent;
     border: none;
     color: var(--text-secondary);
-    font-size: 10px;
+    font-size: var(--fs-sm);
     cursor: pointer;
     border-radius: 4px;
     transition: all 0.2s ease;
@@ -124,7 +124,7 @@
 }
 
 .hero-name {
-    font-size: 0.9rem;
+    font-size: var(--fs-base);
     color: var(--text-secondary);
     font-weight: 500;
 }
@@ -136,7 +136,7 @@
 }
 
 .hero-mod-count {
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     color: var(--text-secondary);
     background: var(--tag-bg);
     padding: 1px 5px;
@@ -169,7 +169,7 @@
     cursor: pointer;
     text-align: left;
     color: var(--text-secondary);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     transition: all 0.2s ease;
     margin-left: 4px;
     /* Space from border line */
@@ -190,8 +190,8 @@
 }
 
 .skin-mod-count {
-    font-size: 12px;
-    opacity: 0.5;
+    font-size: var(--fs-xs);
+  color: var(--text-secondary);
 }
 
 .hero-skin-item.default-skin-entry {

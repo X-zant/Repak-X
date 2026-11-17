@@ -5,7 +5,7 @@
   padding: 0.4rem 0.75rem;
   border-radius: 4px;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   border: 1px solid transparent;
 }
 
@@ -16,7 +16,7 @@
   padding: 0.3rem 0.75rem 0.3rem 0.5rem;
   border-radius: 4px;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   background: rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
   border: 1px solid var(--panel-border);
@@ -29,9 +29,9 @@
 }
 
 .category-badge {
-  background: #4a9eff20;
-  color: var(--accent-primary, #4a9eff);
-  border: 1px solid rgba(74, 158, 255, 0.35);
+  background: color-mix(in srgb, var(--accent-primary), transparent 87%);
+  color: var(--accent-primary);
+  border: 1px solid color-mix(in srgb, var(--accent-primary), transparent 65%);
 }
 
 /* Specific Category Colors */
@@ -121,7 +121,7 @@
   padding: 0.4rem 0.75rem;
   border-radius: 4px;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   background: rgba(120, 120, 130, 0.15);
   color: #a1a1aa;
   border: 1px solid rgba(161, 161, 170, 0.35);
@@ -133,7 +133,7 @@
   padding: 0.4rem 0.75rem;
   border-radius: 4px;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   background: rgba(192, 38, 211, 0.15);
   color: #e879f9;
   border: 1px solid rgba(192, 38, 211, 0.35);
@@ -144,7 +144,7 @@
 /* Darker, more saturated for readability   */
 /* ========================================= */
 [data-theme="light"] .category-badge {
-  background: rgba(74, 158, 255, 0.18);
+  background: color-mix(in srgb, var(--accent-primary), transparent 82%);
   color: #2563eb;
   border-color: rgba(37, 99, 235, 0.4);
 }
@@ -251,10 +251,10 @@
   gap: 5px;
   padding: 0.15rem 0.5rem;
   border-radius: 4px;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
   white-space: nowrap;
-  color: #ff9800;
+  color: var(--warning);
   background: rgba(255, 152, 0, 0.12);
   border: 1px solid rgba(255, 152, 0, 0.4);
   cursor: help;

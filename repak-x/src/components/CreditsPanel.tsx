@@ -8,6 +8,7 @@ import { AuroraText } from './ui/AuroraText';
 import ModularLogo from './ui/ModularLogo';
 import mrmLogo from '../assets/extra/mrm_logo.webp';
 import './CreditsPanel.css';
+import { useDialog } from '../hooks/useDialog'
 
 type Contributor = {
     name: string;
@@ -79,7 +80,6 @@ const SPECIAL_THANKS: Contributor[] = [
         name: 'Marvel Rivals Modding Server',
         role: 'Where it all started',
         avatar: mrmLogo,
-        icon: '🎮',
         link: 'https://discord.gg/mrm',
         badge: 'community'
     },
@@ -114,6 +114,7 @@ const SPECIAL_THANKS: Contributor[] = [
 ];
 
 export default function CreditsPanel({ onClose, version }: CreditsPanelProps) {
+    const dialog = useDialog(onClose, 'Credits')
     const handleLinkClick = (e: React.MouseEvent<HTMLElement>, link?: string) => {
         e.preventDefault();
         e.stopPropagation();
@@ -125,6 +126,7 @@ export default function CreditsPanel({ onClose, version }: CreditsPanelProps) {
     return (
         <div className="modal-overlay" onClick={onClose}>
             <motion.div
+                {...dialog}
                 className="modal-content credits-modal"
                 onClick={(e) => e.stopPropagation()}
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -133,7 +135,7 @@ export default function CreditsPanel({ onClose, version }: CreditsPanelProps) {
             >
                 <div className="modal-header">
                     <h2>Credits</h2>
-                    <button className="modal-close" onClick={onClose}>×</button>
+                    <button aria-label="Close" className="modal-close" onClick={onClose}>×</button>
                 </div>
 
                 <div className="modal-body">

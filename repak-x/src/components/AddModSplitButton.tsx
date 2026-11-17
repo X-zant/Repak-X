@@ -24,7 +24,7 @@ const StyledButtonGroup = styled(ButtonGroup)(({ theme }) => ({
 const LeftButton = styled(Button)(({ theme }) => ({
     background: 'linear-gradient(45deg, var(--accent-primary), var(--accent-secondary))',
     color: 'white',
-    fontSize: '1rem',
+    fontSize: 'var(--fs-md)',
     fontWeight: 600,
     textTransform: 'none',
     padding: '0 24px',
@@ -41,7 +41,7 @@ const LeftButton = styled(Button)(({ theme }) => ({
 const RightButton = styled(Button)(({ theme }) => ({
     background: 'linear-gradient(45deg, var(--accent-secondary), var(--accent-primary))',
     color: 'white',
-    fontSize: '1rem',
+    fontSize: 'var(--fs-md)',
     fontWeight: 600,
     textTransform: 'none',
     padding: '0 24px',
@@ -104,11 +104,11 @@ export default function AddModSplitButton({ onAddFiles, onAddFolder, ...rest }: 
     return (
         <StyledButtonGroup variant="contained" aria-label="add mods button group" {...rest}>
             <LeftButton onClick={handleAddFiles} title="Install PAKs or Archives">
-                <GrInstall style={{ marginRight: '8px', fontSize: '1.5rem' }} />
+                <GrInstall style={{ marginRight: '8px', fontSize: 'var(--fs-xl)' }} />
                 PAK
             </LeftButton>
             <RightButton onClick={handleAddFolder} title="Install Folder (Raw/Uassets)">
-                <CreateNewFolderIcon style={{ marginRight: '8px', fontSize: '1.5rem' }} />
+                <CreateNewFolderIcon style={{ marginRight: '8px', fontSize: 'var(--fs-xl)' }} />
                 Folder
             </RightButton>
         </StyledButtonGroup>

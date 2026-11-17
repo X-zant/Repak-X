@@ -287,7 +287,7 @@ export default function ModDetailsPanel({ mod, initialDetails, onClose, characte
                         borderTopRightRadius: details.is_encrypted ? '0' : '4px',
                         borderBottomRightRadius: details.is_encrypted ? '0' : '4px',
                         fontWeight: 600,
-                        fontSize: '0.85rem',
+                        fontSize: 'var(--fs-sm)',
                         background: 'rgba(76, 175, 80, 0.15)',
                         color: '#4CAF50',
                         border: '1px solid rgba(76, 175, 80, 0.35)',
@@ -305,7 +305,7 @@ export default function ModDetailsPanel({ mod, initialDetails, onClose, characte
                         borderTopRightRadius: '4px',
                         borderBottomRightRadius: '4px',
                         fontWeight: 600,
-                        fontSize: '0.85rem',
+                        fontSize: 'var(--fs-sm)',
                         background: 'rgba(59, 130, 246, 0.15)',
                         color: '#60a5fa',
                         border: '1px solid rgba(59, 130, 246, 0.35)',
@@ -402,15 +402,6 @@ export default function ModDetailsPanel({ mod, initialDetails, onClose, characte
       </div>
     </div>
   )
-}
-
-function getFileIcon(filename: string) {
-  if (filename.endsWith('.uasset')) return '📦'
-  if (filename.endsWith('.uexp')) return '📄'
-  if (filename.endsWith('.umap')) return '🗺️'
-  if (filename.endsWith('.wem') || filename.endsWith('.bnk')) return '🔊'
-  if (filename.endsWith('.png') || filename.endsWith('.jpg')) return '🖼️'
-  return '📄'
 }
 
 // Portraits come from the synced cache (see utils/heroImages), falling back to
