@@ -2194,27 +2194,34 @@ function App() {
     if (togglingModsRef.current.has(toggleKey)) return
     togglingModsRef.current.add(toggleKey)
     try {
-      const newState = await invoke('toggle_mod', { modPath })
+      const newState = await invoke('toggle_mod', { modPath }) as boolean
       setStatus(newState ? 'Mod enabled' : 'Mod disabled')
 
-      // Extract the base name (without extension) to find the mod after toggle
-      // The path changes from .pak to .bak_repak or vice versa
-      const baseName = modPath.replace(/\.(pak|bak_repak)$/i, '')
-
-      const refreshedMods = await loadMods()
-
-      // Update selectedMod if the toggled mod was selected
-      // Find the mod by matching the base path (without extension)
+      // Update the row in place instead of reloading the whole list. toggle_mod
+      // swaps the last extension (Rust with_extension): on -> .pak, off -> .bak_repak.
+      const newPath = modPath.replace(/\.[^.\\/]+$/, newState ? '.pak' : '.bak_repak')
+      const move = <T,>(rec: Record<string, T>) => {
+        if (!(modPath in rec)) return rec
+        const { [modPath]: v, ...rest } = rec
+        return { ...rest, [newPath]: v }
+      }
+      setMods(prev => prev.map(m => m.path === modPath ? { ...m, path: newPath, enabled: newState } : m))
+      commitModDetails(move(modDetailsRef.current))
+      modDetailsSigRef.current = move(modDetailsSigRef.current)
+      setSelectedMods(prev => {
+        if (!prev.has(modPath)) return prev
+        const next = new Set(prev)
+        next.delete(modPath)
+        next.add(newPath)
+        return next
+      })
       if (selectedMod && selectedMod.path === modPath) {
-        const updatedMod = refreshedMods.find(m =>
-          m.path.replace(/\.(pak|bak_repak)$/i, '') === baseName
-        )
-        if (updatedMod) {
-          setSelectedMod(updatedMod)
-        }
+        setSelectedMod({ ...selectedMod, path: newPath, enabled: newState })
       }
 
-      scheduleSafeModsRefresh('single-toggle-post-reload')
+      // One reconcile with disk afterwards (debounced, so rapid toggles share it);
+      // the folder watcher's own reload covers the rest
+      scheduleSafeModsRefresh('single-toggle')
     } catch (error) {
       setStatus('Error toggling mod: ' + error)
     } finally {
@@ -3108,6 +3115,19 @@ function App() {
 
     return true
   })
+
+  // Mods per folder in one pass (the tree used to filter every mod once per folder).
+  // With subfolder mods shown, a mod also counts toward every folder above its own.
+  const folderModCounts = new Map<string, number>()
+  for (const m of baseFilteredMods) {
+    let id = m.folder_id
+    while (id) {
+      folderModCounts.set(id, (folderModCounts.get(id) ?? 0) + 1)
+      if (!showSubfolderMods) break
+      const cut = id.lastIndexOf('/')
+      id = cut > 0 ? id.slice(0, cut) : ''
+    }
+  }
 
   // Apply folder filter to get final list for display
   const filteredMods = baseFilteredMods.filter(mod => {
@@ -4216,19 +4236,9 @@ function App() {
                   onSelect={setSelectedFolderId}
                   onDelete={handleDeleteFolder}
                   onContextMenu={handleFolderContextMenu}
-                  getCount={(id: string) => {
-                    if (id === 'all') return baseFilteredMods.length;
-                    if (showSubfolderMods) {
-                      return baseFilteredMods.filter(m =>
-                        m.folder_id === id ||
-                        (m.folder_id && m.folder_id.startsWith(id + '/'))
-                      ).length;
-                    } else {
-                      return baseFilteredMods.filter(m =>
-                        m.folder_id === id
-                      ).length;
-                    }
-                  }}
+                  getCount={(id: string) =>
+                    id === 'all' ? baseFilteredMods.length : folderModCounts.get(id) ?? 0
+                  }
                   hasFilters={selectedCharacters.size > 0 || selectedCategories.size > 0}
                 />
               </div>

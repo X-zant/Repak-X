@@ -43,6 +43,20 @@ pub fn extract_rar(rar_path: &str, output_dir: &str) -> Result<(), unrar::error:
     Ok(())
 }
 
+/// A message a player can act on when an archive will not unpack: password
+/// protected, or damaged / not really that format. `err` is the extractor's text.
+pub fn describe_extract_error(archive: &Path, err: &str) -> String {
+    let name = archive
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| archive.display().to_string());
+    if err.to_lowercase().contains("password") {
+        format!("{name} is password protected. Unpack it yourself, then install the files inside.")
+    } else {
+        format!("{name} could not be unpacked: it may be damaged or not a real archive. Try downloading it again. ({err})")
+    }
+}
+
 /// True when `path` stays inside the folder it is joined to: no "..", root or drive.
 fn is_safe_entry_path(path: &Path) -> bool {
     path.components()
@@ -68,8 +82,18 @@ pub fn extract_7z(archive_path: &str, output_dir: &str) -> io::Result<()> {
     let output_path = Path::new(output_dir);
     std::fs::create_dir_all(output_path)?;
 
-    // Use sevenz_rust2's decompress_file utility for simple extraction
-    sevenz_rust2::decompress_file(archive_path, output_path).map_err(|e| {
+    // sevenz_rust2 joins entry names onto the output folder unchecked, so a crafted
+    // archive could write outside it: skip those entries (drained, so the next one
+    // in a solid block still lines up), same rule as the rar path.
+    sevenz_rust2::decompress_file_with_extract_fn(archive_path, output_path, |entry, reader, dest| {
+        if !is_safe_entry_path(Path::new(entry.name())) {
+            log::warn!("Skipping 7z entry outside the extract folder: {}", entry.name());
+            std::io::copy(reader, &mut std::io::sink())?;
+            return Ok(true);
+        }
+        sevenz_rust2::default_entry_extract_fn(entry, reader, dest)
+    })
+    .map_err(|e| {
         io::Error::new(
             io::ErrorKind::Other,
             format!("Failed to extract 7z archive: {}", e),

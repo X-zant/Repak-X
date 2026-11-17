@@ -2114,7 +2114,9 @@ async fn inspect_archive_mods(path: String, window: Window) -> Result<Vec<Archiv
             extract_7z(src_str, temp_path_str)
         };
 
-        extract_result.map_err(|e| format!("Failed to extract archive: {}", e))?;
+        extract_result.map_err(|e| {
+            crate::install_mod::install_mod_logic::archives::describe_extract_error(&src, &e.to_string())
+        })?;
 
         scan_root = temp_path;
         _temp_guard = Some(temp_dir);
@@ -2585,11 +2587,13 @@ fn quick_organize_impl(
             };
 
             if let Err(e) = extract_result {
-                error!("[QuickOrganize] Failed to extract archive: {}", e);
-                let _ = window.emit(
-                    "install_log",
-                    format!("[QuickOrganize] ERROR: Failed to extract archive: {}", e),
+                let msg = crate::install_mod::install_mod_logic::archives::describe_extract_error(
+                    &path,
+                    &e.to_string(),
                 );
+                error!("[QuickOrganize] {}", msg);
+                ui_log::error("Install", msg.clone());
+                let _ = window.emit("install_log", format!("[QuickOrganize] ERROR: {}", msg));
                 continue;
             }
 
@@ -7720,12 +7724,55 @@ fn emit_session_banner(app: &tauri::App) {
     );
 }
 
+/// The log file, rolled over to `<name>.old.log` at start and whenever it passes
+/// `LOG_MAX_BYTES`, so a long session cannot grow it without bound and the
+/// previous session's log survives a restart (bug reports usually follow one).
+struct RollingLog {
+    path: PathBuf,
+    file: File,
+    written: u64,
+}
+
+const LOG_MAX_BYTES: u64 = 10 * 1024 * 1024;
+
+impl RollingLog {
+    fn open(path: PathBuf) -> std::io::Result<Self> {
+        Self::roll(&path);
+        Ok(Self { file: File::create(&path)?, path, written: 0 })
+    }
+
+    fn roll(path: &Path) {
+        if path.exists() {
+            let _ = std::fs::rename(path, path.with_extension("old.log"));
+        }
+    }
+}
+
+impl std::io::Write for RollingLog {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if self.written + buf.len() as u64 > LOG_MAX_BYTES {
+            self.file.flush()?;
+            Self::roll(&self.path);
+            self.file = File::create(&self.path)?;
+            self.written = 0;
+        }
+        let n = self.file.write(buf)?;
+        self.written += n as u64;
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.file.flush()
+    }
+}
+
 fn setup_logging() {
     let log_dir = log_dir();
     let log_file = log_dir.join("repakx.log");
 
     // Attempt to create the log directory
-    let log_file_result = std::fs::create_dir_all(&log_dir).and_then(|_| File::create(&log_file));
+    let log_file_result =
+        std::fs::create_dir_all(&log_dir).and_then(|_| RollingLog::open(log_file.clone()));
 
     let final_log_file = match log_file_result {
         Ok(file) => {
@@ -7738,7 +7785,7 @@ fn setup_logging() {
             eprintln!("Failed to create log at {}: {}", log_file.display(), e);
             let temp_log = std::env::temp_dir().join("repakx.log");
             eprintln!("Fallback logging to: {}", temp_log.display());
-            File::create(&temp_log).expect("Failed to create log file even in temp directory")
+            RollingLog::open(temp_log).expect("Failed to create log file even in temp directory")
         }
     };
 
@@ -8266,6 +8313,13 @@ async fn check_mod_clashes(
             }
         };
 
+        // PAKs list "Marvel/Content/X", IoStore "/Game/X", and casing varies between
+        // tools: one spelling so a PAK mod and an IoStore mod on the same asset clash
+        let files = files
+            .iter()
+            .map(|f| asset_explorer::normalize_asset_path(f))
+            .collect();
+
         mods_info.push(ModInfo {
             path: path.to_path_buf(),
             priority,
@@ -8308,15 +8362,17 @@ async fn check_mod_clashes(
                 let mod1 = &same_priority_mods[i];
                 let mod2 = &same_priority_mods[j];
 
-                // Convert file lists to HashSets for efficient intersection
-                let files1: HashSet<&String> = mod1.files.iter().collect();
-                let files2: HashSet<&String> = mod2.files.iter().collect();
+                // Compare case-insensitively; report mod1's spelling
+                let files2: HashSet<String> =
+                    mod2.files.iter().map(|f| f.to_lowercase()).collect();
 
                 // Find overlapping files, excluding metadata files like 'patched_files'
-                let overlapping_files: Vec<String> = files1
-                    .intersection(&files2)
+                let overlapping_files: Vec<String> = mod1
+                    .files
+                    .iter()
+                    .filter(|f| files2.contains(&f.to_lowercase()))
                     .filter(|f| !f.ends_with("patched_files") && !f.contains("/patched_files"))
-                    .map(|s| (*s).clone())
+                    .cloned()
                     .collect();
 
                 if !overlapping_files.is_empty() {
@@ -8442,24 +8498,29 @@ async fn check_single_mod_conflicts(
         priority
     }
 
-    // Helper to get files from a PAK or IoStore
+    // Helper to get files from a PAK or IoStore, in one spelling for both
+    // (PAK "Marvel/Content/X" vs IoStore "/Game/X"), see check_mod_clashes
     fn get_pak_files(path: &Path) -> Result<Vec<String>, String> {
         let mut utoc_path = path.to_path_buf();
         utoc_path.set_extension("utoc");
 
-        if utoc_path.exists() {
+        let files = if utoc_path.exists() {
             use crate::utoc_utils::read_utoc;
-            Ok(read_utoc(&utoc_path)
+            read_utoc(&utoc_path)
                 .iter()
                 .map(|entry| entry.file_path.clone())
-                .collect())
+                .collect()
         } else {
             uasset_toolkit::list_pak_files(
                 path.to_str().unwrap_or_default(),
                 Some(crate::install_mod::AES_KEY_HEX),
             )
-            .map_err(|e| format!("Failed to read PAK: {}", e))
-        }
+            .map_err(|e| format!("Failed to read PAK: {}", e))?
+        };
+        Ok(files
+            .iter()
+            .map(|f: &String| asset_explorer::normalize_asset_path(f))
+            .collect())
     }
 
     // Get target mod info
@@ -8495,16 +8556,17 @@ async fn check_single_mod_conflicts(
 
         // Get this mod's files
         let other_files: HashSet<String> = match get_pak_files(path) {
-            Ok(files) => files.into_iter().collect(),
+            Ok(files) => files.into_iter().map(|f| f.to_lowercase()).collect(),
             Err(e) => {
                 warn!("Failed to read mod {:?}: {}", path, e);
                 continue;
             }
         };
 
-        // Find overlapping files, excluding metadata files like 'patched_files'
+        // Find overlapping files (case-insensitive), excluding metadata files like 'patched_files'
         let overlapping: Vec<String> = target_files
-            .intersection(&other_files)
+            .iter()
+            .filter(|f| other_files.contains(&f.to_lowercase()))
             .filter(|f| !f.ends_with("patched_files") && !f.contains("/patched_files"))
             .cloned()
             .collect();
@@ -9109,6 +9171,15 @@ fn main() {
             // void. Entries land in a replay buffer until the webview mounts.
             ui_log::init(app.handle().clone());
             emit_session_banner(app);
+
+            // Work folders a closed or crashed run left in %TEMP%/repak-x (VFX
+            // Updater steps, archive unpacks). Nothing can be using them yet.
+            std::thread::spawn(|| {
+                if let Err(e) = vfx_updater::file_ops::cleanup_vfx_temp_directories() {
+                    warn!("Startup temp cleanup (VFX): {}", e);
+                }
+                install_mod::cleanup_stale_install_temp();
+            });
 
             app.manage(GalactaWatcher(Mutex::new(start_galacta_state_watcher(app.handle()))));
 

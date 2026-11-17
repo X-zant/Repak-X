@@ -403,6 +403,28 @@ pub fn write_install_debug(msg: &str) {
     }
 }
 
+/// Archive unpack folders that live for a whole install (see map_to_mods_internal).
+const INSTALL_TEMP_PREFIX: &str = "rinst_";
+
+/// %TEMP%/repak-x, shared with the VFX Updater's rvfx_ folders.
+fn repak_x_temp_root() -> PathBuf {
+    let root = std::env::temp_dir().join("repak-x");
+    let _ = std::fs::create_dir_all(&root);
+    root
+}
+
+/// Delete the archive unpack folders earlier runs left behind. Call once at start,
+/// before any install can begin.
+pub fn cleanup_stale_install_temp() {
+    let Ok(entries) = std::fs::read_dir(repak_x_temp_root()) else { return };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        if name.to_string_lossy().starts_with(INSTALL_TEMP_PREFIX) {
+            let _ = std::fs::remove_dir_all(entry.path());
+        }
+    }
+}
+
 fn map_to_mods_internal(paths: &[PathBuf]) -> Vec<InstallableMod> {
     // Clear debug log
     if let Some(config_dir) = dirs::config_dir() {
@@ -507,21 +529,33 @@ fn map_to_mods_internal(paths: &[PathBuf]) -> Vec<InstallableMod> {
                 // before find_mods_from_archive reads the PAK files inside it.
                 // We leak the TempDir intentionally so the temp directory persists
                 // until the installation completes (OS cleans up on process exit).
-                let temp_dir_obj = tempdir().unwrap();
+                // Under %TEMP%/repak-x with a known prefix, so the next launch can
+                // delete it (Windows does not clean %TEMP% on exit)
+                let temp_dir_obj = tempfile::Builder::new()
+                    .prefix(INSTALL_TEMP_PREFIX)
+                    .tempdir_in(repak_x_temp_root())
+                    .or_else(|_| tempdir())
+                    .unwrap();
                 let tempdir = temp_dir_obj.path().to_str().unwrap().to_string();
                 // Leak the TempDir to prevent cleanup - the extracted PAK files
                 // must remain accessible during the entire installation flow
                 std::mem::forget(temp_dir_obj);
 
-                if extension == "zip" {
-                    extract_zip(path.to_str().unwrap(), &tempdir)
-                        .expect("Unable to extract zip archive")
+                // A bad archive skips just itself, never the whole install (these were .expect()s)
+                let extracted = if extension == "zip" {
+                    extract_zip(path.to_str().unwrap(), &tempdir).map_err(|e| e.to_string())
                 } else if extension == "rar" {
-                    extract_rar(path.to_str().unwrap(), &tempdir)
-                        .expect("Unable to extract rar archive")
+                    extract_rar(path.to_str().unwrap(), &tempdir).map_err(|e| e.to_string())
                 } else if extension == "7z" {
-                    extract_7z(path.to_str().unwrap(), &tempdir)
-                        .expect("Unable to extract 7z archive")
+                    extract_7z(path.to_str().unwrap(), &tempdir).map_err(|e| e.to_string())
+                } else {
+                    Ok(())
+                };
+                if let Err(e) = extracted {
+                    let msg = crate::install_mod::install_mod_logic::archives::describe_extract_error(&path, &e);
+                    error!("{}", msg);
+                    crate::ui_log::error("Install", msg);
+                    return None;
                 }
 
                 // Now find pak files / iostore mods and turn them into installable mods
