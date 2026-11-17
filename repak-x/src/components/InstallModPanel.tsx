@@ -373,9 +373,9 @@ export default function InstallModPanel({ mods, allTags, folders = [], currentFo
         {/* Mod Cards */}
         <div className="imp-mods-section">
           {mods.length > 1 && mods.some(m => m.contains_uassets !== false) && mods.some(m => m.contains_raw_assets && m.contains_uassets === false) && (
-            <div className="install-hybrid-merge-banner" style={{ background: 'rgba(76, 175, 80, 0.1)', border: '1px solid #4CAF50', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="install-hybrid-merge-banner" style={{ background: 'color-mix(in srgb, var(--success), transparent 90%)', border: '1px solid var(--success)', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div className="hybrid-merge-text" style={{ display: 'flex', flexDirection: 'column' }}>
-                <span className="hybrid-merge-title" style={{ color: '#4CAF50', fontWeight: 'bold' }}>Hybrid Match Detected</span>
+                <span className="hybrid-merge-title" style={{ color: 'var(--success)', fontWeight: 'bold' }}>Hybrid Match Detected</span>
                 <span className="hybrid-merge-desc" style={{ fontSize: '0.9em', opacity: 0.8 }}>You dropped both cooked assets and raw assets. Would you like to merge them into a single Hybrid mod?</span>
               </div>
               <button className="btn-hybrid" onClick={() => {
@@ -669,8 +669,13 @@ export default function InstallModPanel({ mods, allTags, folders = [], currentFo
           <button onClick={onCancel} className="btn-cancel">
             Cancel
           </button>
-          <button onClick={handleInstall} className="btn-install" disabled={enabledCount === 0}>
-            Install {enabledCount} Mod(s)
+          <button
+            onClick={handleInstall}
+            className="btn-install"
+            disabled={enabledCount === 0}
+            title={enabledCount === 0 ? 'Turn on at least one mod to install' : undefined}
+          >
+            Install {enabledCount} mod{enabledCount === 1 ? '' : 's'}
           </button>
         </div>
       </motion.div>

@@ -2,7 +2,7 @@
 .extension-overlay {
     position: fixed;
     inset: 0;
-    z-index: 99999;
+    z-index: var(--z-blocking);
     background: var(--overlay-bg, rgba(0, 0, 0, 0.8));
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -86,7 +86,9 @@
     align-items: center;
     justify-content: center;
     font-size: var(--fs-lg);
-    transition: all 0.2s ease;
+    transition-property: background-color, color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .close-btn:hover {
@@ -158,7 +160,9 @@
     font-size: var(--fs-xs);
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition-property: background-color, border-color, opacity;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .extension-panel .btn-new-folder:hover:not(:disabled) {
@@ -199,7 +203,9 @@
     padding: 10px 12px;
     border-radius: 8px;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition-property: background-color, color, box-shadow, opacity, margin-bottom;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
     font-size: var(--fs-base);
     color: var(--text-primary);
 }
@@ -278,7 +284,9 @@
     font-size: var(--fs-base);
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition-property: background-color, color, transform, box-shadow, opacity;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
     border: none;
 }
 

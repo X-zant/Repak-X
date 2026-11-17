@@ -195,7 +195,7 @@ export function AlertProvider({ children, placement = DEFAULT_CONFIG.placement }
     // Promise toast - shows loading state while promise is pending
     const promise = useCallback(<T = any>(promiseOrFn: Promise<T> | (() => Promise<T>), options: AlertOptions = {}) => {
         const {
-            loading = { title: 'Loading...', description: 'Please wait' },
+            loading = { title: 'Loading...', description: 'This can take a moment' },
             success: successConfig = { title: 'Success', description: 'Operation completed' },
             error: errorConfig = { title: 'Error', description: 'Something went wrong' },
             ...restOptions

@@ -75,7 +75,9 @@
     font-size: var(--fs-sm);
     cursor: pointer;
     border-radius: 4px;
-    transition: all 0.2s ease;
+    transition-property: color, background-color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .hero-expand-btn:hover {
@@ -94,7 +96,9 @@
     border-radius: 4px;
     cursor: pointer;
     text-align: left;
-    transition: all 0.2s ease;
+    transition-property: background-color, border-color, padding-left, opacity, color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
     border-left: 3px solid transparent;
 }
 
@@ -170,7 +174,9 @@
     text-align: left;
     color: var(--text-secondary);
     font-size: var(--fs-sm);
-    transition: all 0.2s ease;
+    transition-property: background-color, color, border-color, opacity;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
     margin-left: 4px;
     /* Space from border line */
     border-radius: 0 4px 4px 0;

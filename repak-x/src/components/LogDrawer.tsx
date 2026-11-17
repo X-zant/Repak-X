@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FaTerminal } from 'react-icons/fa'
-import { VscClearAll } from 'react-icons/vsc'
+import { VscClearAll, VscChevronDown, VscChevronUp } from 'react-icons/vsc'
 import { BiCopyAlt } from 'react-icons/bi'
 import { FiDownload, FiSearch, FiX } from 'react-icons/fi'
 import { invoke } from '@tauri-apps/api/core'
@@ -166,7 +166,7 @@ export default function LogDrawer({
     e.preventDefault()
     try {
       await navigator.clipboard.writeText(formatLogLine(entry))
-      showFeedback(entry.id, 'Copied!')
+      showFeedback(entry.id, 'Copied')
     } catch (err) {
       console.error('Failed to copy to clipboard:', err)
     }
@@ -241,7 +241,7 @@ export default function LogDrawer({
             className="log-drawer-btn"
             onClick={onToggle}
           >
-            {isOpen ? 'Hide ▼' : 'Show ▲'}
+            {isOpen ? <>Hide <VscChevronDown aria-hidden="true" /></> : <>Show <VscChevronUp aria-hidden="true" /></>}
           </button>
         </div>
       </div>
@@ -367,7 +367,7 @@ export default function LogDrawer({
                       <span className="log-drawer-line-scope">{entry.scope}</span>
                       <span className="log-drawer-line-content">{entry.message}</span>
                       {copyFeedback?.id === entry.id && (
-                        <span className="log-line-feedback">Copied!</span>
+                        <span className="log-line-feedback">Copied</span>
                       )}
                     </div>
                   ))}

@@ -318,11 +318,11 @@ export default function SharingPanel({ onClose, gamePath, installedMods, selecte
 
   const handleStartSharing = async () => {
     if (selectedModPaths.size === 0) {
-      alert.error("Select Mods", "Please select at least one mod to share.");
+      alert.error("Select Mods", "Select at least one mod to share.");
       return;
     }
     if (!packName.trim()) {
-      alert.error("Missing Name", "Please enter a pack name.");
+      alert.error("Missing Name", "Enter a pack name.");
       return;
     }
 
@@ -380,7 +380,7 @@ export default function SharingPanel({ onClose, gamePath, installedMods, selecte
 
   const handleStartReceiving = async () => {
     if (!connectionString.trim()) {
-      alert.error("Missing Code", "Please enter a connection string.");
+      alert.error("Missing Code", "Enter a connection string.");
       return;
     }
 
@@ -741,6 +741,7 @@ export default function SharingPanel({ onClose, gamePath, installedMods, selecte
                     onClick={handleStartReceiving}
                     className="btn-primary btn-large"
                     disabled={isValidCode !== true}
+                    title={isValidCode !== true ? 'Enter a valid share code first' : undefined}
                   >
                     <DownloadIcon /> Connect & Receive
                   </button>
@@ -750,8 +751,8 @@ export default function SharingPanel({ onClose, gamePath, installedMods, selecte
                   {receiveComplete ? (
                     <div className="completion-state">
                       <CheckIcon className="success-icon-large" />
-                      <h3>Received Complete!</h3>
-                      <p>All mods have been received and installed successfully.</p>
+                      <h3>Mods received</h3>
+                      <p>All mods were received and installed.</p>
                       <button
                         onClick={() => {
                           setReceiveComplete(false);

@@ -57,7 +57,7 @@ export function AnimatedThemeToggler({ theme, setTheme, duration = 400 }: Animat
         }
         
         ::view-transition-new(root) {
-          z-index: 9999;
+          z-index: var(--z-top);
           animation: theme-toggle-reveal var(--theme-toggle-duration, 400ms) ease-out;
         }
         

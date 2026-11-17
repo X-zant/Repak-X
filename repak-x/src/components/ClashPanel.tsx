@@ -64,11 +64,11 @@ const ClashPanel = ({ clashes, mods = [], onSetPriority, onToggleMod, onClose }:
                         {clashes.length > 0 && (
                             <span style={{
                                 fontSize: 'var(--fs-sm)',
-                                background: 'rgba(244, 67, 54, 0.1)',
+                                background: 'color-mix(in srgb, var(--danger), transparent 90%)',
                                 color: 'var(--danger)',
                                 padding: '2px 8px',
                                 borderRadius: '12px',
-                                border: '1px solid rgba(244, 67, 54, 0.2)'
+                                border: '1px solid color-mix(in srgb, var(--danger), transparent 80%)'
                             }}>
                                 {clashes.length}
                             </span>

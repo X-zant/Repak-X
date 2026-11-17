@@ -4,7 +4,7 @@
   /* Must clear every overlay, since the tooltip is appended to <body> and so
      competes with them in the root stacking context. The extension overlay sits
      at 99999; at the old 10000 its tooltips rendered behind the panel. */
-  z-index: 999999;
+  z-index: var(--z-tooltip);
   padding: 0.5rem 0.75rem;
   border-radius: 0.5rem;
   font-size: var(--fs-sm);

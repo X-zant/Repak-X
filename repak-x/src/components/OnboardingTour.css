@@ -1,13 +1,13 @@
 .onboarding-overlay {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: var(--z-top);
   pointer-events: auto;
 }
 
 .onboarding-cutout {
   position: fixed;
-  z-index: 10000;
+  z-index: var(--z-top-raised);
   border-radius: 8px;
   background: transparent;
   box-shadow:
@@ -19,7 +19,7 @@
 
 .onboarding-tooltip {
   position: fixed;
-  z-index: 10001;
+  z-index: calc(var(--z-top-raised) + 1);
   max-width: 420px;
   width: 420px;
   background: var(--panel-bg);

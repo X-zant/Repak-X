@@ -9,7 +9,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
+  z-index: var(--z-modal);
   padding: 1.5rem;
   backdrop-filter: blur(4px);
 }
@@ -84,7 +84,9 @@
   font-weight: 500;
   text-align: left;
   cursor: pointer;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  transition-property: background-color, color, border-color, box-shadow, opacity;
+  transition-duration: 0.15s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .settings-nav-item:hover:not(.active) {
@@ -313,7 +315,9 @@
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  transition: all 0.2s;
+  transition-property: background-color, color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .modal-close:hover {
@@ -397,7 +401,9 @@
   border-radius: 8px;
   /* Slightly more rounded */
   padding: 4px;
-  transition: all 0.2s ease;
+  transition-property: border-color, box-shadow;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .combined-input-group:focus-within {
@@ -437,7 +443,9 @@
   font-size: var(--fs-sm);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition-property: background-color, color, transform, padding;
+  transition-duration: 0.2s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   height: 32px;
   white-space: nowrap;
 }
@@ -482,7 +490,9 @@
   font-size: var(--fs-base);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition-property: background-color, transform;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .btn-primary:hover {
@@ -499,7 +509,9 @@
   cursor: pointer;
   font-size: var(--fs-base);
   font-weight: 500;
-  transition: all 0.2s;
+  transition-property: background-color, color, border-color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .btn-secondary:hover {
@@ -529,7 +541,9 @@
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
-  transition: all 0.2s;
+  transition-property: border-color, transform, box-shadow;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
   flex-shrink: 0;
   aspect-ratio: 1;
 }
@@ -596,7 +610,9 @@
   padding: 8px 16px;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition-property: color, background-color, box-shadow, border-color;
+  transition-duration: 0.2s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   font-family: inherit;
   font-weight: 500;
 }

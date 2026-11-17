@@ -8,7 +8,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-panel);
   backdrop-filter: blur(4px);
 }
 
@@ -116,7 +116,9 @@
   font-size: var(--fs-lg);
   line-height: 1;
   padding: 0;
-  transition: all 0.2s;
+  transition-property: background-color, color, border-color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .add-tag-btn:hover {
@@ -131,13 +133,13 @@
   top: 100%;
   left: 0;
   margin-top: 4px;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
   border-radius: 6px;
   padding: 4px 0;
   min-width: 160px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  z-index: 1000;
+  z-index: var(--z-dropdown);
   max-height: 300px;
   overflow-y: auto;
 }
@@ -145,7 +147,7 @@
 .dropdown-item {
   padding: 6px 12px;
   cursor: pointer;
-  color: #e0e0e0;
+  color: var(--text-primary);
   font-size: var(--fs-base);
   white-space: nowrap;
   display: flex;
@@ -169,7 +171,7 @@
 .dropdown-item-delete {
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: var(--fs-md);
   padding: 0 2px;
@@ -189,7 +191,7 @@
 
 .dropdown-separator {
   height: 1px;
-  background: #3a3a3a;
+  background: var(--panel-border);
   margin: 4px 0;
 }
 
@@ -393,7 +395,9 @@
   background: color-mix(in srgb, var(--accent-primary), transparent 92%);
   border: 1px solid color-mix(in srgb, var(--accent-primary), transparent 80%);
   border-radius: 12px;
-  transition: all 0.2s ease;
+  transition-property: background-color, border-color, opacity;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .repak-toggle:hover {
@@ -420,7 +424,9 @@
   background: rgba(76, 175, 80, 0.08);
   border: 1px solid rgba(76, 175, 80, 0.2);
   border-radius: 12px;
-  transition: all 0.2s ease;
+  transition-property: background-color, border-color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .hybrid-toggle:hover {
@@ -442,7 +448,9 @@
   background: rgba(255, 160, 0, 0.08);
   border: 1px solid rgba(255, 160, 0, 0.2);
   border-radius: 12px;
-  transition: all 0.2s ease;
+  transition-property: background-color, border-color, color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .legacy-toggle:hover {
@@ -476,13 +484,13 @@
 
 /* No UAssets Badge */
 .no-uassets-badge {
-  background: rgba(100, 100, 100, 0.5);
-  color: #ddd;
+  background: var(--tag-bg);
+  color: var(--text-secondary);
   padding: 4px 8px;
   border-radius: 4px;
   font-size: var(--fs-xs);
   font-weight: 500;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--tag-border);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -564,7 +572,9 @@
   font-size: var(--fs-base);
   font-weight: bold;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition-property: background-color, box-shadow;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
   white-space: nowrap;
 }
@@ -713,7 +723,9 @@
   background: color-mix(in srgb, var(--accent-primary), transparent 90%);
   color: var(--accent-primary);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition-property: background-color, border-color, opacity;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .imp-btn-new-folder:hover:not(:disabled) {
@@ -753,7 +765,9 @@
   padding: 6px 8px;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition-property: background-color, color, box-shadow, opacity, margin-bottom;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
   font-size: var(--fs-sm);
   color: var(--text-primary);
 }

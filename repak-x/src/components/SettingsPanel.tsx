@@ -283,7 +283,7 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
                             fontStyle: parallelProcessing ? 'italic' : 'normal',
                             color: parallelProcessing ? accentColor : 'inherit',
                             textShadow: parallelProcessing ? '2px 2px 0px rgba(0,0,0,0.2)' : 'none',
-                            transition: 'all 0.2s ease'
+                            transition: 'opacity 0.2s ease, color 0.2s ease, text-shadow 0.2s ease'
                           }}>
                             {parallelProcessing ? 'BOOST' : 'Normal'}
                           </span>

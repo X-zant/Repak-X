@@ -1,7 +1,7 @@
 .promise-transition-loader {
   position: fixed;
   inset: 0;
-  z-index: 4000;
+  z-index: var(--z-loader);
   pointer-events: none;
   display: flex;
   align-items: center;

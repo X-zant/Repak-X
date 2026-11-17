@@ -706,7 +706,7 @@ function App() {
           setDropTargetFolder(null)
           alert.warning(
             'Cannot Quick-Organize Folder Mods',
-            'Folder mods with UAssets need to be processed. Please drop them on the Install Mods area.',
+            'Folder mods with UAssets need to be processed. Drop them on the Install Mods area.',
             { duration: 8000 }
           )
           return
@@ -1452,7 +1452,7 @@ function App() {
 
     const unlistenComplete = listen('install_complete', () => {
       uiLog.success('Install', 'Installation complete')
-      setStatus('Installation complete!')
+      setStatus('Installation complete')
       setIsModsLoading(false)
       setModLoadingProgress(0)
       loadMods()
@@ -2562,7 +2562,7 @@ function App() {
       for (const modPath of movePaths) {
         await invoke('assign_mod_to_folder', { modPath, folderId: effectiveFolderId })
       }
-      setStatus(`Moved ${movePaths.length} mod(s) to folder!`)
+      setStatus(`Moved ${movePaths.length} mod${movePaths.length === 1 ? '' : 's'} to folder`)
       setSelectedMods(new Set())
       await loadMods()
       await loadFolders()
@@ -2787,7 +2787,7 @@ function App() {
 
           await loadMods()
           await loadFolders()
-          setStatus(`Mod installed successfully!`)
+          setStatus(`Mod installed`)
 
           // Only after the install has actually succeeded. A failure above
           // throws, so the download is left in place for the user to retry.
@@ -2827,7 +2827,7 @@ function App() {
         },
         success: () => ({
           title: 'Installation Complete',
-          description: 'Mod installed successfully from browser extension'
+          description: 'Installed from the browser extension'
         }),
         error: (err) => ({
           title: 'Installation Failed',
@@ -2870,7 +2870,7 @@ function App() {
 
           await loadMods()
           await loadFolders()
-          setStatus(`${pathCount} PAK file(s) copied successfully!`)
+          setStatus(`Copied ${pathCount} PAK file${pathCount === 1 ? '' : 's'}`)
 
           // Show warning after success if game is running
           if (gameRunning) {
@@ -3155,6 +3155,11 @@ function App() {
         e.preventDefault()
         return
       }
+
+      // Inside a dialog or menu, keys belong to it, not to the mods list behind it
+      if (eventTarget instanceof Element && eventTarget.closest('[role="dialog"], [role="menu"]')) return
+      // A modal is open but focus slipped out of it (e.g. to body): only Escape gets through
+      if (key !== 'escape' && document.querySelector('[aria-modal="true"]')) return
       // Ctrl+R - Full React reinit
       else if (ctrl && key === 'r' && !shift) {
         e.preventDefault()
@@ -3413,7 +3418,7 @@ function App() {
         loadMods()
         loadFolders()
         loadTags()
-        setStatus('Mods installed successfully!')
+        setStatus('Mods installed')
 
         // Reset DRP status to Idle (or effective mod count if we could easily get it)
         // For now, Idle is safe and functionally correct
@@ -4381,7 +4386,7 @@ function App() {
                         <button
                           onClick={() => handleBulkToggle(true)}
                           className="btn-ghost left"
-                          style={{ height: '100%', opacity: allEnabled ? 0.4 : 1 }}
+                          style={{ height: '100%' }}
                           disabled={selectedMods.size === 0 || allEnabled}
                           title={allEnabled ? 'All selected mods are already enabled' : `Enable ${disabledCount} disabled mod${disabledCount !== 1 ? 's' : ''}`}
                         >
@@ -4391,7 +4396,7 @@ function App() {
                         <button
                           onClick={() => handleBulkToggle(false)}
                           className="btn-ghost right"
-                          style={{ height: '100%', opacity: allDisabled ? 0.4 : 1 }}
+                          style={{ height: '100%' }}
                           disabled={selectedMods.size === 0 || allDisabled}
                           title={allDisabled ? 'All selected mods are already disabled' : `Disable ${enabledCount} enabled mod${enabledCount !== 1 ? 's' : ''}`}
                         >

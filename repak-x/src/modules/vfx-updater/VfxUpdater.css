@@ -101,7 +101,9 @@
   border-radius: 8px;
   color: var(--text-primary);
   font-size: var(--fs-sm);
-  transition: all 0.2s ease;
+  transition-property: border-color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .vfx-input-group input:focus {
@@ -117,7 +119,9 @@
   color: var(--text-primary);
   cursor: pointer;
   font-weight: 500;
-  transition: all 0.2s ease;
+  transition-property: background-color, border-color, color, opacity;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .vfx-input-group button:hover:not(:disabled) {
@@ -149,7 +153,9 @@
   letter-spacing: 2px;
   cursor: pointer;
   text-transform: uppercase;
-  transition: all 0.3s ease;
+  transition-property: inset, background-color, opacity, color, filter, transform, text-shadow, box-shadow;
+  transition-duration: 0.3s;
+  transition-timing-function: ease;
   position: relative;
   overflow: hidden;
 }
@@ -247,7 +253,9 @@
   background: color-mix(in srgb, var(--text-primary), transparent 95%);
   transform: skewX(-30deg);
   margin: 0 4px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition-property: background-color, box-shadow;
+  transition-duration: 0.3s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-primary), transparent 90%);
 }
 
@@ -347,7 +355,9 @@
   justify-content: center;
   gap: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition-property: background-color, border-color, color, box-shadow, transform;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
   width: 100%;
 }
 
@@ -436,7 +446,9 @@
   color: var(--text-primary);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition-property: background-color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .btn-secondary:hover {
@@ -452,7 +464,9 @@
   color: var(--on-accent);
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition-property: transform, filter, box-shadow;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
   box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-primary), transparent 60%);
 }
 
@@ -502,7 +516,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition-property: color, background-color, border-color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .vfx-logs-copy-btn:hover {
@@ -562,7 +578,7 @@
 }
 
 ::view-transition-new(root) {
-  z-index: 9999;
+  z-index: var(--z-top);
   animation: theme-toggle-reveal var(--theme-toggle-duration, 400ms) ease-out;
 }
 

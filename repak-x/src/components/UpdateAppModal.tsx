@@ -206,6 +206,7 @@ export default function UpdateAppModal({
                                     className="btn-secondary"
                                     onClick={() => onOpenReleasePage(updateInfo.url || '')}
                                     disabled={!updateInfo.url}
+                                    title={!updateInfo.url ? 'This update has no release page link' : undefined}
                                 >
                                     <MdOpenInNew /> View Release
                                 </button>

@@ -23,14 +23,14 @@ const StyledButtonGroup = styled(ButtonGroup)(({ theme }) => ({
 
 const LeftButton = styled(Button)(({ theme }) => ({
     background: 'linear-gradient(45deg, var(--accent-primary), var(--accent-secondary))',
-    color: 'white',
+    color: 'var(--on-accent)',
     fontSize: 'var(--fs-md)',
     fontWeight: 600,
     textTransform: 'none',
     padding: '0 24px',
     borderRadius: '12px 0 0 12px !important',
     borderRight: '1px solid rgba(255,255,255,0.2) !important',
-    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: 'filter 0.2s cubic-bezier(0.4, 0, 0.2, 1), flex-grow 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
     flex: 1,
     '&:hover': {
         filter: 'brightness(1.1)',
@@ -40,13 +40,13 @@ const LeftButton = styled(Button)(({ theme }) => ({
 
 const RightButton = styled(Button)(({ theme }) => ({
     background: 'linear-gradient(45deg, var(--accent-secondary), var(--accent-primary))',
-    color: 'white',
+    color: 'var(--on-accent)',
     fontSize: 'var(--fs-md)',
     fontWeight: 600,
     textTransform: 'none',
     padding: '0 24px',
     borderRadius: '0 12px 12px 0 !important',
-    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: 'filter 0.2s cubic-bezier(0.4, 0, 0.2, 1), flex-grow 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
     flex: 1,
     '&:hover': {
         filter: 'brightness(1.1)',

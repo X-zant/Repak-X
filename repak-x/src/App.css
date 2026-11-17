@@ -19,6 +19,21 @@ body {
   user-select: none;
 }
 
+/* The app shell is not selectable (feels native), but text people need to copy
+   into a bug report or Discord is: logs, toasts, mod details, paths, changelogs. */
+input,
+textarea,
+.log-drawer-line-content,
+.toast-title,
+.toast-description,
+.details-panel,
+.clash-file-path,
+.changelog-content,
+.update-modal .modal-body {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .app {
   height: 100vh;
   display: flex;
@@ -51,7 +66,7 @@ body {
   align-items: center;
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: var(--z-chrome);
   padding: 1rem 1.5rem 1rem 1.5rem;
   background: var(--header-bg);
   border-bottom: 1px solid var(--header-border);
@@ -68,7 +83,9 @@ body {
   padding: 0.5rem;
   margin: -0.5rem;
   border-radius: 12px;
-  transition: all 0.3s ease;
+  transition-property: text-shadow, transform;
+  transition-duration: 0.3s;
+  transition-timing-function: ease;
 }
 
 
@@ -193,7 +210,9 @@ body {
   width: 100%;
   height: 2px;
   background: linear-gradient(90deg, var(--panel-border) calc(50% - 18px), transparent calc(50% - 18px), transparent calc(50% + 18px), var(--panel-border) calc(50% + 18px));
-  transition: all 0.2s ease;
+  transition-property: background-color, border-color, color, box-shadow, opacity, transform;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 /* The grip handle */
@@ -206,7 +225,9 @@ body {
   border: 1px solid var(--panel-border);
   border-radius: 4px;
   z-index: 1;
-  transition: all 0.2s ease;
+  transition-property: background-color, border-color, color, box-shadow, opacity, transform;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
   background-image:
     linear-gradient(90deg, var(--text-muted) 1px, transparent 1px),
     linear-gradient(90deg, var(--text-muted) 1px, transparent 1px),
@@ -366,7 +387,9 @@ body {
       transparent calc(50% - 18px),
       transparent calc(50% + 18px),
       var(--panel-border) calc(50% + 18px));
-  transition: all 0.2s ease;
+  transition-property: background-color, border-color, color, box-shadow, opacity, transform;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 /* The grip knob */
@@ -382,7 +405,9 @@ body {
   border: 1px solid var(--panel-border);
   border-radius: 4px;
   z-index: 1;
-  transition: all 0.2s ease;
+  transition-property: background-color, border-color, color, box-shadow, opacity, transform;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
   background-image:
     linear-gradient(180deg, var(--text-muted) 1px, transparent 1px),
     linear-gradient(180deg, var(--text-muted) 1px, transparent 1px),
@@ -748,7 +773,9 @@ body {
   color: var(--accent-primary);
   font-weight: 500;
   line-height: 1;
-  transition: all 0.2s ease;
+  transition-property: background-color, border-color, color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .tag svg {
@@ -973,7 +1000,9 @@ button {
   font-size: var(--fs-sm);
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition-property: background-color, border-color, color, box-shadow, opacity, transform;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
   background: var(--bg-light);
   color: var(--text-primary);
   min-height: 36px;
@@ -1004,7 +1033,7 @@ button:hover:not(:disabled) {
 }
 
 .btn-modern:hover:not(:disabled) {
-  background: color-mix(in srgb, #2a2a2a, white 12%);
+  background: color-mix(in srgb, var(--bg-light), var(--text-primary) 10%);
   border-color: rgba(255, 255, 255, 0.22);
 }
 
@@ -1070,7 +1099,7 @@ input[type="text"]:focus {
   padding: 0.8rem 1.5rem;
   background: var(--status-bar-bg);
   border-top: 1px solid var(--status-bar-border);
-  z-index: 100;
+  z-index: var(--z-chrome);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1102,7 +1131,7 @@ input[type="text"]:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-panel);
   pointer-events: none;
 }
 
@@ -1125,7 +1154,7 @@ input[type="text"]:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
+  z-index: var(--z-modal);
 }
 
 .modal-content {
@@ -1260,7 +1289,7 @@ input[type="text"]:focus {
 .file-item-more {
   padding: 0.75rem;
   text-align: center;
-  color: #666;
+  color: var(--text-secondary);
   font-size: var(--fs-sm);
   font-style: italic;
 }
@@ -1270,7 +1299,7 @@ input[type="text"]:focus {
 .error-state {
   padding: 2rem;
   text-align: center;
-  color: #999;
+  color: var(--text-secondary);
 }
 
 .error-state {
@@ -1331,7 +1360,9 @@ input[type="text"]:focus {
   border: 2px solid var(--border-light);
   cursor: pointer;
   padding: 0;
-  transition: all 0.2s ease;
+  transition-property: transform, border-color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .color-option:hover {
@@ -1516,13 +1547,13 @@ input[type="text"]:focus {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(18, 20, 22, 0.85);
+  background: color-mix(in srgb, var(--panel-bg), transparent 15%);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-color);
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
   overflow: hidden;
-  z-index: 120;
+  z-index: var(--z-drawer);
   display: flex;
   flex-direction: column;
   max-height: 85vh;
@@ -1668,7 +1699,9 @@ input[type="text"]:focus {
   border-radius: 6px;
   cursor: pointer;
   color: var(--text-secondary);
-  transition: all 0.2s;
+  transition-property: background-color, border-color, color, opacity;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .folder-item:hover {
@@ -2276,7 +2309,9 @@ input[type="text"]:focus {
 /* MUI Clear Search Button - Theme-aware styling */
 .clear-search-btn {
   color: var(--text-secondary) !important;
-  transition: all 0.2s !important;
+  transition-property: color, background-color;
+  transition-duration: 0.2s;
+  transition-timing-function: !important;
 }
 
 .clear-search-btn:hover {
@@ -2543,6 +2578,6 @@ input[type="text"]:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
+  z-index: var(--z-modal);
   backdrop-filter: blur(4px);
 }

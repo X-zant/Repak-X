@@ -2,7 +2,7 @@
 .input-prompt-overlay {
     position: fixed;
     inset: 0;
-    z-index: 999999;
+    z-index: var(--z-prompt);
     background: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -73,7 +73,9 @@
     align-items: center;
     justify-content: center;
     font-size: var(--fs-md);
-    transition: all 0.15s ease;
+    transition-property: background-color, color;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
 }
 
 .prompt-close:hover {
@@ -106,7 +108,9 @@
     font-size: var(--fs-base);
     font-family: inherit;
     outline: none;
-    transition: all 0.2s ease;
+    transition-property: color, border-color, box-shadow;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .prompt-input::placeholder {
@@ -131,7 +135,9 @@
     font-size: var(--fs-base);
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition-property: transform;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
     border: none;
     font-family: inherit;
 }

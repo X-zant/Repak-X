@@ -161,7 +161,7 @@
 }
 
 .tool-card-status.is-unknown {
-    color: #9e9e9e;
+    color: var(--text-secondary);
 }
 
 .tool-card-status.is-error {

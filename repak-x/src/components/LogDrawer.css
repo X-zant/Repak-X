@@ -9,7 +9,7 @@
   border-top: 1px solid var(--panel-border);
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.3);
   overflow: hidden;
-  z-index: 120;
+  z-index: var(--z-drawer);
   display: flex;
   flex-direction: column;
   max-height: 85vh;
@@ -123,19 +123,30 @@
 
 .log-drawer-actions {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
+  /* room above and below so the button border isn't cut by the 36px header */
+  padding-block: 5px;
+  max-height: 100%;
+  box-sizing: border-box;
 }
 
 .log-drawer-btn {
   background: transparent;
   border: 1px solid var(--border-light);
   color: var(--text-secondary);
-  padding: 4px 10px;
+  padding: 3px 10px;
+  line-height: 1.2;
+  /* the global `button` rule in App.css sets min-height: 36px, taller than the room left in the 36px header */
+  min-height: 0;
+  gap: 4px;
   border-radius: 4px;
   font-size: var(--fs-xs);
   cursor: pointer;
-  transition: all 0.15s ease;
-  font-family: inherit;
+  transition-property: background-color, color, border-color;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
+  font-family: var(--font-primary);
 }
 
 .log-drawer-btn:hover {
@@ -194,7 +205,9 @@
   font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.15s ease;
+  transition-property: color, border-color, background-color;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
 }
 
 .log-drawer-chip:hover {
@@ -274,7 +287,9 @@
   align-items: center;
   justify-content: center;
   font-size: var(--fs-md);
-  transition: all 0.15s ease;
+  transition-property: background-color, color, transform, opacity;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
 }
 
 .log-drawer-action-btn:hover:not(:disabled) {
@@ -405,7 +420,7 @@
 }
 
 .log-drawer-line-number {
-  color: var(--text-secondary);
+  color: var(--text-secondary);
   font-size: var(--fs-xs);
   min-width: 28px;
   text-align: right;
@@ -414,7 +429,7 @@
 }
 
 .log-drawer-line-time {
-  color: var(--text-secondary);
+  color: var(--text-secondary);
   font-size: var(--fs-xs);
   flex-shrink: 0;
   user-select: none;
@@ -520,4 +535,8 @@
   color: var(--warning);
   background: rgba(255, 152, 0, 0.12);
   font-weight: 600;
+}
+/* The header clips overflow (fixed 36px), so draw the focus ring inside */
+.log-drawer-header :focus-visible {
+  outline-offset: -2px;
 }

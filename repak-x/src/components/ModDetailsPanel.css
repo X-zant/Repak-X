@@ -55,7 +55,7 @@
   background: transparent;
   border: none;
   font-size: var(--fs-xl);
-  color: #999;
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 0;
 }
@@ -81,7 +81,7 @@
 
 .detail-section h3 {
   font-size: var(--fs-sm);
-  color: #999;
+  color: var(--text-secondary);
   margin-bottom: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -106,7 +106,9 @@
   color: var(--text-primary);
   border-radius: 4px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition-property: background-color, border-color, padding, font-size;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
 }
 
 .copy-paths-btn:hover {
@@ -130,7 +132,7 @@
 }
 
 .detail-label {
-  color: #999;
+  color: var(--text-secondary);
 }
 
 .detail-value {
@@ -189,7 +191,7 @@
 
 .error-path {
   font-size: 0.9em;
-  color: #999;
+  color: var(--text-secondary);
 }
 
 /* Tooltip styles */

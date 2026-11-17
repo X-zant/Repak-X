@@ -7,7 +7,7 @@
 
 .repakx-tooltip-content {
   position: absolute;
-  z-index: 1000;
+  z-index: var(--z-dropdown);
   padding: 0.5rem 0.75rem;
   border-radius: 0.5rem;
   font-size: var(--fs-sm);

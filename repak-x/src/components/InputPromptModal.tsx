@@ -148,6 +148,7 @@ const InputPromptModal = ({
                                     type="submit"
                                     className="prompt-btn prompt-btn-confirm"
                                     disabled={mode === 'input' && !value.trim()}
+                                    title={mode === 'input' && !value.trim() ? 'Type a name first' : undefined}
                                 >
                                     {confirmText}
                                 </button>

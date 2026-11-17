@@ -174,7 +174,9 @@
   background: rgba(255, 255, 255, 0.15);
   color: inherit;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition-property: background-color, transform;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
   white-space: nowrap;
 }
 
@@ -221,7 +223,9 @@
   border-radius: 6px;
   color: currentColor;
   opacity: 0.5;
-  transition: all 0.2s ease;
+  transition-property: opacity, background-color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -269,7 +273,7 @@
 /* Toast Container for AlertHandler - Card Stacking */
 .toast-container {
   position: fixed;
-  z-index: 9999;
+  z-index: var(--z-top);
   pointer-events: none;
   display: flex;
   flex-direction: column;
@@ -333,7 +337,7 @@
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  z-index: 200;
+  z-index: var(--z-drawer-overlay);
 }
 
 .toast-count-badge {
@@ -360,7 +364,9 @@
   border-radius: 50%;
   color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition-property: background-color, color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
   backdrop-filter: blur(8px);
   display: flex;
   align-items: center;

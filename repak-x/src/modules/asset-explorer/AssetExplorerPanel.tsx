@@ -697,7 +697,6 @@ function ModFilter({ mods, selected, showDisabled, onToggle, onClear }: ModFilte
                 className={`ae-filter-select ${selected.size > 0 ? 'active' : ''}`}
                 onClick={() => setOpen(o => !o)}
             >
-                <VscPackage />
                 {selected.size === 0 ? 'All mods' : `${selected.size} mod${selected.size === 1 ? '' : 's'}`}
                 <FiChevronDown className={`ae-select-caret ${open ? 'is-open' : ''}`} />
             </button>

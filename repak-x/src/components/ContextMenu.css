@@ -7,7 +7,7 @@
   padding: 4px 0;
   min-width: 180px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  z-index: 9999;
+  z-index: var(--z-top);
   color: var(--text-primary);
   font-size: var(--fs-base);
 }
@@ -49,7 +49,7 @@
 .context-menu-item-delete {
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: var(--fs-md);
   padding: 0 2px;
@@ -169,7 +169,7 @@
   padding: 12px;
   min-width: 220px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  z-index: 10000;
+  z-index: var(--z-top-raised);
 }
 
 .rename-panel-header {
@@ -252,7 +252,9 @@
   border-radius: 4px;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: all 0.15s ease;
+  transition-property: background-color, border-color, color, filter;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
 }
 
 .rename-btn.cancel {

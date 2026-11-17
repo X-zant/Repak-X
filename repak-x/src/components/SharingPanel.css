@@ -8,7 +8,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-panel);
   backdrop-filter: blur(4px);
 }
 
@@ -104,7 +104,9 @@
   justify-content: center;
   gap: 0.5rem;
   font-weight: 600;
-  transition: all 0.2s;
+  transition-property: background-color, color, border-color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
   border-bottom: 2px solid transparent;
 }
 
@@ -246,7 +248,9 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  transition: all 0.2s;
+  transition-property: margin-top, background-color, color, opacity, filter, width, padding;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .btn-primary {
@@ -333,7 +337,7 @@
 }
 
 .code-box {
-  background: #000;
+  background: var(--bg-darkest);
   border: 1px solid var(--panel-border);
   padding: 1rem;
   border-radius: 6px;

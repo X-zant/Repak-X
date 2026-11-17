@@ -84,7 +84,9 @@
   background: rgba(255, 255, 255, 0.03);
   border-radius: 6px;
   border: 1px solid transparent;
-  transition: all 0.2s ease;
+  transition-property: background-color, border-color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .checkbox-option:hover {

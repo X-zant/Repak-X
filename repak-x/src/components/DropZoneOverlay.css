@@ -2,7 +2,7 @@
 .dropzone-overlay {
     position: fixed;
     inset: 0;
-    z-index: 99999;
+    z-index: var(--z-blocking);
     background: var(--overlay-bg, rgba(0, 0, 0, 0.75));
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -36,7 +36,9 @@
     background: var(--panel-bg);
     border: 2px dashed var(--panel-border);
     border-radius: 16px;
-    transition: all 0.25s ease;
+    transition-property: border-color, background-color, box-shadow, transform, opacity;
+  transition-duration: 0.25s;
+  transition-timing-function: ease;
     overflow: hidden;
 }
 
@@ -60,7 +62,9 @@
     color: var(--accent-primary);
     margin-bottom: 1rem;
     opacity: 0.8;
-    transition: all 0.25s ease;
+    transition-property: opacity, transform;
+  transition-duration: 0.25s;
+  transition-timing-function: ease;
 }
 
 .dropzone-card.active .zone-icon {
@@ -124,7 +128,9 @@
     color: var(--text-secondary);
     font-size: var(--fs-sm);
     font-weight: 500;
-    transition: all 0.2s ease;
+    transition-property: border-color, background-color, color, transform, box-shadow;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .new-folder-drop-target svg {
@@ -208,7 +214,9 @@
     padding: 8px 12px;
     border-radius: 6px;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition-property: background-color, color, opacity;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
     font-size: var(--fs-sm);
     color: var(--text-primary);
 }

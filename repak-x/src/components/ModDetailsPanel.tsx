@@ -288,10 +288,10 @@ export default function ModDetailsPanel({ mod, initialDetails, onClose, characte
                         borderBottomRightRadius: details.is_encrypted ? '0' : '4px',
                         fontWeight: 600,
                         fontSize: 'var(--fs-sm)',
-                        background: 'rgba(76, 175, 80, 0.15)',
-                        color: '#4CAF50',
-                        border: '1px solid rgba(76, 175, 80, 0.35)',
-                        borderLeft: details.is_iostore ? 'none' : '1px solid rgba(76, 175, 80, 0.35)'
+                        background: 'color-mix(in srgb, var(--success), transparent 85%)',
+                        color: 'var(--success)',
+                        border: '1px solid color-mix(in srgb, var(--success), transparent 65%)',
+                        borderLeft: details.is_iostore ? 'none' : '1px solid color-mix(in srgb, var(--success), transparent 65%)'
                       }} title="Contains both IO Store assets and Legacy Pak raw assets">Hybrid</div>
                     )}
                     {details.is_encrypted && (
@@ -306,10 +306,10 @@ export default function ModDetailsPanel({ mod, initialDetails, onClose, characte
                         borderBottomRightRadius: '4px',
                         fontWeight: 600,
                         fontSize: 'var(--fs-sm)',
-                        background: 'rgba(59, 130, 246, 0.15)',
-                        color: '#60a5fa',
-                        border: '1px solid rgba(59, 130, 246, 0.35)',
-                        borderLeft: details.is_iostore || details.is_hybrid ? 'none' : '1px solid rgba(59, 130, 246, 0.35)'
+                        background: 'color-mix(in srgb, var(--accent-primary), transparent 85%)',
+                        color: 'var(--accent-primary)',
+                        border: '1px solid color-mix(in srgb, var(--accent-primary), transparent 65%)',
+                        borderLeft: details.is_iostore || details.is_hybrid ? 'none' : '1px solid color-mix(in srgb, var(--accent-primary), transparent 65%)'
                       }} title="This mod package is encrypted">Encrypted</div>
                     )}
                   </div>
@@ -374,7 +374,7 @@ export default function ModDetailsPanel({ mod, initialDetails, onClose, characte
                         // Show feedback
                         const btn = e.currentTarget
                         const original = btn.textContent
-                        btn.textContent = 'Copied!'
+                        btn.textContent = 'Copied'
                         setTimeout(() => { btn.textContent = original }, 1500)
                       })
                     }}

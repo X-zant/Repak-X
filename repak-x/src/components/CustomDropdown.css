@@ -76,7 +76,7 @@
     border-radius: 12px;
     padding: 4px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-    z-index: 1000;
+    z-index: var(--z-dropdown);
     display: flex;
     flex-direction: column;
 }
@@ -140,7 +140,7 @@
 .custom-dropdown-item-delete {
     background: none;
     border: none;
-    color: #888;
+    color: var(--text-secondary);
     cursor: pointer;
     font-size: var(--fs-md);
     padding: 0;

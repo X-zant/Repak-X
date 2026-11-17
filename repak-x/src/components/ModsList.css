@@ -211,7 +211,9 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    transition: all 0.2s ease;
+    transition-property: max-height, min-height, padding, gap, border-radius, border-color, background-color, transform, box-shadow, filter;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
     color: var(--text-primary);
     min-height: 120px;
     max-height: 120px;
@@ -599,7 +601,9 @@
     color: var(--text-primary);
     font-weight: 500;
     line-height: 1;
-    transition: all 0.2s ease;
+    transition-property: background-color, border-color, color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .mod-card .tag:hover {
@@ -674,7 +678,9 @@
     cursor: pointer;
     position: relative;
     overflow: hidden;
-    transition: all 0.2s;
+    transition-property: width, height, background-color, color, top, bottom, left, border-radius;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .hold-delete:hover {

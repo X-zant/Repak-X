@@ -81,7 +81,9 @@
     background: var(--bg-dark);
     border: 1px solid var(--panel-border);
     border-radius: 10px;
-    transition: all 0.2s ease;
+    transition-property: background-color, border-color, transform, box-shadow, color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
     cursor: pointer;
     text-decoration: none;
 }
@@ -214,7 +216,9 @@
     font-size: var(--fs-base);
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition-property: background-color, border-color, transform, box-shadow;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .credits-trigger-btn:hover {
@@ -278,7 +282,9 @@
     text-align: center;
     white-space: nowrap;
     line-height: 1.4;
-    transition: all 0.2s ease;
+    transition-property: border-color, color, background-color, box-shadow;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 .credits-tester-chip:hover {

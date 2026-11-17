@@ -30,7 +30,9 @@
   font-size: calc(1.1rem * var(--scale));
   line-height: 1;
   padding: 0;
-  transition: all 0.2s ease;
+  transition-property: background-color, color, transform, opacity;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
   flex-shrink: 0;
 }
 

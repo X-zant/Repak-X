@@ -166,7 +166,55 @@ button {
 .modal-overlay {
   background: var(--overlay);
 }
+/* Stacking layers, lowest to highest. Small local values (0-10) inside a
+   component stay literal; anything that competes app-wide uses these. */
+:root {
+  --z-chrome: 100;          /* header, status bar */
+  --z-drawer: 200;          /* install drawer, log drawer */
+  --z-drawer-overlay: 300;  /* toast footer over drawers */
+  --z-panel: 1000;          /* full-window panels: install, sharing, drop zone */
+  --z-dropdown: 1100;       /* dropdown menus, component tooltips */
+  --z-modal: 2000;          /* .modal-overlay dialogs */
+  --z-loader: 3000;         /* promise transition loader */
+  --z-top: 9000;            /* title bar, context menu, toasts, onboarding, theme transition */
+  --z-top-raised: 9010;     /* rename panel, onboarding cutout (+1 for its tooltip) */
+  --z-blocking: 9500;       /* drop / extension / quick-organize overlays */
+  --z-prompt: 9800;         /* input prompt over everything */
+  --z-tooltip: 9900;        /* global hover tooltips */
+}
+
 /* Dialog panels take focus on open; keyboard focus inside them is what should show */
 [role="dialog"]:focus {
   outline: none;
+}
+
+/* Keyboard focus ring: shows where Tab focus is, never on mouse clicks.
+   Text inputs are left out; their caret and focus border already show it. */
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible,
+input[type="range"]:focus-visible,
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+[role="switch"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Disabled buttons: flat, readable, clearly inert. Replaces per-component
+   opacity fades, which dropped text below readable contrast. !important because
+   it is a terminal state that must beat every component's own colours. */
+button:disabled {
+  background: var(--field-bg) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-secondary) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+  cursor: not-allowed !important;
 }

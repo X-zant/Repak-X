@@ -27,7 +27,7 @@ const TOUR_STEPS: TourStep[] = [
     {
         target: '[data-tour="header-branding"]',
         title: 'Welcome to Repak X',
-        description: "Your all-in-one Marvel Rivals mod manager and installer. Let's take a quick tour of the main features!",
+        description: "Your all-in-one Marvel Rivals mod manager and installer. Here's a quick tour of the main features.",
         placement: 'bottom',
     },
     {
@@ -87,7 +87,7 @@ const TOUR_STEPS: TourStep[] = [
     {
         target: '[data-tour="settings-btn"]',
         title: 'Settings',
-        description: 'Configure your game path and app preferences to your liking. You can replay this tour from Settings anytime!',
+        description: 'Configure your game path and app preferences to your liking. You can replay this tour from Settings anytime.',
         placement: 'left',
     },
 ]
