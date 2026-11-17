@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, memo } from 'react'
 import { motion } from 'framer-motion'
 import { Tooltip } from '@mui/material'
 import { RiDeleteBin2Fill } from 'react-icons/ri'
-import { FaTag } from "react-icons/fa6"
+import { FaTag, FaLock } from "react-icons/fa6"
+import { IoMdWarning } from "react-icons/io"
 import Checkbox from './ui/Checkbox'
 import Switch from './ui/Switch'
 import NumberInput from './ui/NumberInput'
@@ -30,6 +31,8 @@ type ModRecord = {
 }
 
 type ViewMode = 'grid' | 'compact' | 'list' | 'list-compact'
+
+export type GalactaLoadState = 'loaded' | 'notLoaded' | null
 
 type ModDetailsRecord = {
     character_name?: string
@@ -65,7 +68,12 @@ type ModItemProps = {
     onRename?: (path: string, nextName: string) => void
     shouldStartRenaming?: boolean
     onClearRenaming?: () => void
-    gameRunning?: boolean
+    /** Rename, delete and priority are blocked (game running, or loaded by Galacta). */
+    locked?: boolean
+    /** Galacta Mode badge: the game has this mod loaded, or it is enabled but not loaded. */
+    loadState?: GalactaLoadState
+    /** e.g. "the Mod Toggle Key (F7)", for the lock tooltips */
+    toggleKeyText?: string
     onRenameBlocked?: () => void
     onDeleteBlocked?: () => void
     modDetails?: ModDetailsRecord
@@ -96,7 +104,9 @@ type ModsListProps = {
     renamingModPath?: string | null
     onClearRenaming?: () => void
     gridRef?: React.Ref<HTMLDivElement>
-    gameRunning?: boolean
+    isModLocked?: (path: string) => boolean
+    galactaLoadState?: (path: string, enabled?: boolean) => GalactaLoadState
+    toggleKeyText?: string
     onRenameBlocked?: () => void
     onDeleteBlocked?: () => void
     holdToDelete?: boolean
@@ -134,7 +144,9 @@ const ModItem = memo(function ModItem({
     onRename,
     shouldStartRenaming,
     onClearRenaming,
-    gameRunning,
+    locked,
+    loadState,
+    toggleKeyText = 'the Mod Toggle Key',
     onRenameBlocked,
     onDeleteBlocked,
     modDetails,
@@ -193,7 +205,7 @@ const ModItem = memo(function ModItem({
 
     const startDeleteHold = (e: React.MouseEvent<HTMLButtonElement> | React.TouchEvent<HTMLButtonElement>) => {
         e.stopPropagation()
-        if (gameRunning) {
+        if (locked) {
             onDeleteBlocked?.()
             return
         }
@@ -221,7 +233,7 @@ const ModItem = memo(function ModItem({
     // Inline rename handlers
     const startRename = (e?: React.MouseEvent) => {
         e?.stopPropagation()
-        if (gameRunning) {
+        if (locked) {
             onRenameBlocked?.()
             return
         }
@@ -395,6 +407,14 @@ const ModItem = memo(function ModItem({
                                 {shouldShowSuffix && <span className="mod-name-suffix">{suffix}</span>}
                             </span>
                         </span>
+                        {loadState === 'notLoaded' && (
+                            <span
+                                className="galacta-not-loaded-icon"
+                                title={`Enabled but not loaded: Project Galacta rejected it, or it was enabled after login. Press ${toggleKeyText} twice in game to load it.`}
+                            >
+                                <IoMdWarning />
+                            </span>
+                        )}
                     </button>
                 )}
             </div>
@@ -502,8 +522,14 @@ const ModItem = memo(function ModItem({
                         min={0}
                         max={7}
                         onChange={(newPriority) => handleSetPriority(mod.path, newPriority)}
-                        disabled={gameRunning}
+                        disabled={locked}
                     />
+                    {loadState === 'loaded' ? (
+                        // Loaded by Project Galacta: the lock takes the place of toggle and delete
+                        <span className="galacta-ingame-tag" title={`Loaded by the game. Press ${toggleKeyText} in game to unload mods, then change it.`}>
+                            <FaLock /> Loaded
+                        </span>
+                    ) : (<>
                     <div className="mod-switch-wrapper" onClick={(e) => e.stopPropagation()} >
                         <Switch title={mod.enabled ? 'Disable mod' : 'Enable mod'}
                             size="sm"
@@ -528,6 +554,7 @@ const ModItem = memo(function ModItem({
                     >
                         <RiDeleteBin2Fill size={18} />
                     </button>
+                    </>)}
                 </div>
             </div>
         </div>
@@ -561,7 +588,9 @@ export default function ModsList({
     renamingModPath,
     onClearRenaming,
     gridRef,
-    gameRunning,
+    isModLocked,
+    galactaLoadState,
+    toggleKeyText,
     onRenameBlocked,
     onDeleteBlocked,
     holdToDelete,
@@ -617,7 +646,9 @@ export default function ModsList({
                                 onRename={onRename}
                                 shouldStartRenaming={renamingModPath === mod.path}
                                 onClearRenaming={onClearRenaming}
-                                gameRunning={gameRunning}
+                                locked={isModLocked?.(mod.path) ?? false}
+                                loadState={galactaLoadState?.(mod.path, mod.enabled) ?? null}
+                                toggleKeyText={toggleKeyText}
                                 onRenameBlocked={onRenameBlocked}
                                 onDeleteBlocked={onDeleteBlocked}
                                 holdToDelete={holdToDelete}

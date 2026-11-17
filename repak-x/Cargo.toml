@@ -92,6 +92,8 @@ winreg = "0.52"
 default = []
 # Serves frontend from embedded assets instead of dev server (required for production builds)
 custom-protocol = ["tauri/custom-protocol"]
+# Rebuild the UAssetTool NativeAOT library during dev (`npm run tauri:aot`)
+aot = ["uasset_toolkit/aot"]
 
 [build-dependencies]
 winres = "0.1.12"

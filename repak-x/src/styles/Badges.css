@@ -244,3 +244,36 @@
   background: rgba(0, 0, 0, 0.06);
   border-color: rgba(0, 0, 0, 0.15);
 }
+/* Galacta Mode: lock tag that replaces toggle + delete on mods loaded in game */
+.galacta-ingame-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: #ff9800;
+  background: rgba(255, 152, 0, 0.12);
+  border: 1px solid rgba(255, 152, 0, 0.4);
+  cursor: help;
+}
+
+/* Enabled but not loaded by Galacta: small warning after the mod name */
+.galacta-not-loaded-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  color: #f87171;
+  flex-shrink: 0;
+  cursor: help;
+}
+
+/* "(128 loaded)" suffix inside the Game Running launch button. The button content is a
+   flex row with an 8px gap; pull back to a normal word space. */
+.galacta-launch-status {
+  margin-left: -4px;
+  font-weight: 500;
+  opacity: 0.85;
+}

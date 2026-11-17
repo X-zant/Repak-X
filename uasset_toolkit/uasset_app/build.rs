@@ -73,25 +73,20 @@ fn main() {
         .join("src")
         .join("UAssetTool");
 
-    // Rebuild when the FFI surface or the C# sources change.
-    for watched in [
-        "NativeExports.cs",
-        "Program.cs",
-        "UAssetToolNative.csproj",
-        "UAssetTool.csproj",
-        "Directory.Build.props",
-    ] {
-        let p = tool_project_dir.join(watched);
-        if p.exists() {
-            println!("cargo:rerun-if-changed={}", p.display());
+    // The AOT publish is slow, so it only runs with the `aot` feature
+    // (`npm run tauri:aot` / `cargo tauri dev -f aot`) or on release builds.
+    let profile = env::var("PROFILE").unwrap_or_default();
+    let build_aot = env::var("CARGO_FEATURE_AOT").is_ok() || profile == "release";
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-env-changed=SKIP_UASSET_TOOL_BUILD");
+
+    if build_aot {
+        // Watch only C# sources: watching whole dirs picks up bin/obj and git_commit.txt,
+        // which dotnet rewrites on every publish and so retriggers this script forever.
+        let src_dir = workspace_root.join("UAssetToolRivals").join("src");
+        for dir in [tool_project_dir.clone(), src_dir.join("UAssetAPI")] {
+            watch_sources(&dir);
         }
-    }
-    let uasset_api_dir = workspace_root
-        .join("UAssetToolRivals")
-        .join("src")
-        .join("UAssetAPI");
-    if uasset_api_dir.exists() {
-        println!("cargo:rerun-if-changed={}", uasset_api_dir.display());
     }
 
     if let Err(e) = fs::create_dir_all(&tool_output_dir) {
@@ -111,15 +106,14 @@ fn main() {
         runtime_id, lib_name
     );
 
-    if !dest_lib.exists() {
-        println!("cargo:rerun-if-changed=build.rs");
-    }
-
     // Allow skipping the (slow) AOT build, e.g. for fast Rust-only iteration or when
     // the library was produced out of band. When set, never invoke dotnet.
     if env::var("SKIP_UASSET_TOOL_BUILD").is_ok() {
         if dest_lib.exists() {
-            println!("cargo:warning=SKIP_UASSET_TOOL_BUILD set; using existing {}", dest_lib.display());
+            println!(
+                "cargo:warning=SKIP_UASSET_TOOL_BUILD set; using existing {}",
+                dest_lib.display()
+            );
         } else {
             println!(
                 "cargo:warning=SKIP_UASSET_TOOL_BUILD set but {} is missing; \
@@ -148,8 +142,10 @@ fn main() {
 
     // 1) Try to publish the NativeAOT library.
     let mut produced = false;
-    let dotnet_available = Command::new("dotnet").arg("--version").output().is_ok();
-    if dotnet_available {
+    let dotnet_available = build_aot && Command::new("dotnet").arg("--version").output().is_ok();
+    if !build_aot {
+        println!("cargo:warning=AOT build skipped (enable with the `aot` feature); using prebuilt UAssetTool library");
+    } else if dotnet_available {
         let mut cmd = Command::new("dotnet");
         cmd.current_dir(&tool_project_dir).args([
             "publish",
@@ -170,7 +166,10 @@ fn main() {
                 if built_lib.exists() {
                     match fs::copy(&built_lib, &dest_lib) {
                         Ok(_) => {
-                            println!("cargo:warning=UAssetTool AOT library -> {}", dest_lib.display());
+                            println!(
+                                "cargo:warning=UAssetTool AOT library -> {}",
+                                dest_lib.display()
+                            );
                             produced = true;
                             copy_native_deps(&publish_dir, &tool_output_dir);
                         }
@@ -232,7 +231,6 @@ fn main() {
              'dotnet publish UAssetToolRivals/src/UAssetTool/UAssetToolNative.csproj -c Release -r {}'",
             runtime_id
         );
-        let profile = env::var("PROFILE").unwrap_or_default();
         if profile == "release" {
             panic!("{}", msg);
         } else {
@@ -241,6 +239,28 @@ fn main() {
                 "cargo:warning=Continuing debug build without the native library; \
                  UAssetTool calls will fail at runtime until it is built."
             );
+        }
+    }
+}
+
+/// Emit `rerun-if-changed` for every C# source/project file under `dir`, skipping
+/// dotnet output dirs (bin*, obj*).
+fn watch_sources(dir: &Path) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_lowercase();
+        if path.is_dir() {
+            if !name.starts_with("bin") && !name.starts_with("obj") {
+                watch_sources(&path);
+            }
+        } else if [".cs", ".csproj", ".props"]
+            .iter()
+            .any(|ext| name.ends_with(ext))
+        {
+            println!("cargo:rerun-if-changed={}", path.display());
         }
     }
 }
@@ -264,7 +284,10 @@ fn ensure_vswhere_on_path(cmd: &mut Command) {
         if installer.join("vswhere.exe").exists() {
             let current = env::var("PATH").unwrap_or_default();
             cmd.env("PATH", format!("{};{}", installer.display(), current));
-            println!("cargo:warning=Added VS Installer dir to PATH for AOT link: {}", installer.display());
+            println!(
+                "cargo:warning=Added VS Installer dir to PATH for AOT link: {}",
+                installer.display()
+            );
             return;
         }
     }
@@ -276,10 +299,7 @@ fn ensure_vswhere_on_path(_cmd: &mut Command) {}
 /// Copy native dependency libraries that NativeAOT does not statically link into the
 /// main library (e.g. blake3_dotnet.dll) next to it, so the OS can resolve them.
 fn copy_native_deps(src_dir: &Path, dest_dir: &Path) {
-    let native_deps = [
-        "blake3_dotnet.dll",
-        "libblake3_dotnet.so",
-    ];
+    let native_deps = ["blake3_dotnet.dll", "libblake3_dotnet.so"];
 
     for dep_name in &native_deps {
         let src = src_dir.join(dep_name);

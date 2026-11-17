@@ -21,4 +21,8 @@ anyhow.workspace = true
 log = "0.4"
 libloading = "0.8"
 
+[features]
+# Build the UAssetTool NativeAOT library in build.rs (always on for release builds).
+aot = []
+
 [build-dependencies]

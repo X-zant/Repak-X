@@ -147,6 +147,8 @@ struct AppState {
     show_subfolder_mods: bool,
     #[serde(default)]
     bypass_game_running_lock: bool,
+    #[serde(default = "default_true")]
+    galacta_mode: bool,
     #[serde(default)]
     allow_mod_overwrite: bool,
     #[serde(default = "default_true")]
@@ -205,6 +207,7 @@ impl Default for AppState {
             hold_to_delete: default_true(),
             show_subfolder_mods: default_true(),
             bypass_game_running_lock: false,
+            galacta_mode: default_true(),
             allow_mod_overwrite: false,
             enable_drp: default_true(),
             launcher_type: default_launcher_type(),
@@ -321,6 +324,8 @@ struct AppSettings {
     hold_to_delete: bool,
     show_subfolder_mods: bool,
     bypass_game_running_lock: bool,
+    #[serde(default = "default_true")]
+    galacta_mode: bool,
     #[serde(default)]
     allow_mod_overwrite: bool,
     enable_drp: bool,
@@ -358,6 +363,7 @@ async fn get_app_settings(state: State<'_, Arc<Mutex<AppState>>>) -> Result<AppS
         hold_to_delete: state.hold_to_delete,
         show_subfolder_mods: state.show_subfolder_mods,
         bypass_game_running_lock: state.bypass_game_running_lock,
+        galacta_mode: state.galacta_mode,
         allow_mod_overwrite: state.allow_mod_overwrite,
         enable_drp: state.enable_drp,
         launcher_type: state.launcher_type.clone(),
@@ -389,6 +395,7 @@ async fn save_app_settings(
     state.hold_to_delete = settings.hold_to_delete;
     state.show_subfolder_mods = settings.show_subfolder_mods;
     state.bypass_game_running_lock = settings.bypass_game_running_lock;
+    state.galacta_mode = settings.galacta_mode;
     state.allow_mod_overwrite = settings.allow_mod_overwrite;
     state.enable_drp = settings.enable_drp;
     state.launcher_type = settings.launcher_type;
@@ -3957,9 +3964,15 @@ fn rename_mod_files(old: &Path, new: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Like [`rename_mod_files`], but replaces any mod already at `new`. Its files
-/// (.utoc and .ucas included, so none are left paired with the wrong mod) are set
-/// aside first and only deleted once the rename worked, otherwise they're put back.
+/// The same mod's main file in every enabled/disabled state (.pak, .bak_repak, .pak_disabled).
+fn mod_state_variants(path: &Path) -> [PathBuf; 3] {
+    ["pak", "bak_repak", "pak_disabled"].map(|ext| path.with_extension(ext))
+}
+
+/// Like [`rename_mod_files`], but replaces any mod already at `new`, in any
+/// enabled/disabled state. Its files (.utoc and .ucas included, so none are left
+/// paired with the wrong mod) are set aside first and only deleted once the
+/// rename worked, otherwise they're put back.
 fn replace_mod_files(old: &Path, new: &Path) -> std::io::Result<()> {
     if is_case_only_rename(old, new) {
         return rename_mod_files(old, new);
@@ -3967,11 +3980,11 @@ fn replace_mod_files(old: &Path, new: &Path) -> std::io::Result<()> {
 
     let mut set_aside: Vec<(PathBuf, PathBuf)> = Vec::new();
     let mut result = Ok(());
-    for path in [
-        new.to_path_buf(),
-        new.with_extension("utoc"),
-        new.with_extension("ucas"),
-    ] {
+    let mut targets = vec![new.to_path_buf()];
+    targets.extend(mod_state_variants(new));
+    targets.extend([new.with_extension("utoc"), new.with_extension("ucas")]);
+    // A duplicate entry is harmless: it no longer exists once set aside
+    for path in targets {
         if !path.exists() {
             continue;
         }
@@ -4014,6 +4027,20 @@ mod rename_mod_files_tests {
         assert_eq!(std::fs::read_to_string(p("b.pak")).unwrap(), "a.pak");
         assert!(!p("a.pak").exists() && !p("b.utoc").exists() && !p("b.ucas").exists());
         assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn replace_removes_a_disabled_copy_of_the_same_mod() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = |name: &str| dir.path().join(name);
+        std::fs::create_dir(p("sub")).unwrap();
+        for name in ["a.pak", "sub/a.bak_repak", "sub/a.utoc"] {
+            std::fs::write(p(name), name).unwrap();
+        }
+
+        replace_mod_files(&p("a.pak"), &p("sub/a.pak")).unwrap();
+        assert_eq!(std::fs::read_to_string(p("sub/a.pak")).unwrap(), "a.pak");
+        assert!(!p("sub/a.bak_repak").exists() && !p("sub/a.utoc").exists());
     }
 
     #[test]
@@ -4650,8 +4677,10 @@ async fn assign_mod_to_folder(
         return Ok(());
     }
 
-    // rename() replaces an existing file, which would erase the mod already there
-    if dest_path.exists() && !state.allow_mod_overwrite {
+    // rename() replaces an existing file, which would erase the mod already there;
+    // a copy in another enabled/disabled state is the same mod and would be left as a ghost
+    let dest_taken = dest_path.exists() || mod_state_variants(&dest_path).iter().any(|p| p.exists());
+    if dest_taken && !state.allow_mod_overwrite {
         let error_msg = "A mod with this name already exists in that folder".to_string();
         toast_events::emit_move_failed(&window, &error_msg);
         return Err(error_msg);
@@ -5210,9 +5239,148 @@ async fn check_game_running() -> Result<bool, String> {
     Ok(is_game_process_running())
 }
 
-/// Reliable game process detection using multiple methods
-/// Uses exe() path as primary method, falls back to name() matching
+// ============================================================================
+// GALACTA MODE
+// ============================================================================
+// Project Galacta's mod loader writes `Saved/Galacta_ModState.galacta` after its
+// login pass and after every Mod Toggle Key press: `mounted|<path>|...|end` or `unmounted|end`.
+// With it, only the paks the game really has mounted need to stay locked.
+
+/// What Repak-X knows about the game's mounted mods.
+#[derive(Serialize, Debug, PartialEq)]
+#[serde(tag = "status", rename_all = "camelCase")]
+enum GalactaModState {
+    /// Game is not running: nothing is locked.
+    NotRunning,
+    /// Game is running but the state file is missing, incomplete or from an earlier
+    /// session (Galacta hasn't run its login pass yet): everything stays locked.
+    NoInfo,
+    /// `keys` are the mounted mods (see `galacta_mod_key`); empty when `mounted` is false.
+    Live { mounted: bool, keys: Vec<String> },
+}
+
+/// The game's `Marvel/Saved` dir: `%LOCALAPPDATA%` on Windows, the Proton prefix on Linux.
+fn galacta_saved_dir() -> Option<PathBuf> {
+    crash_monitor::get_crash_log_path().parent().map(Path::to_path_buf)
+}
+
+const GALACTA_STATE_FILE: &str = "Galacta_ModState.galacta";
+
+/// Matching key for a mod: lowercase path after `~mods/`, `/` separators, no extension.
+/// The frontend builds the same key from a mod's absolute path, so `.pak`, `.bak_repak`
+/// and `.pak_disabled` all map to one key. Paks outside `~mods` give `None`.
+fn galacta_mod_key(path: &str) -> Option<String> {
+    let p = path.replace('\\', "/").to_lowercase();
+    let rel = &p[p.rfind("~mods/")? + "~mods/".len()..];
+    let stem_end = match rel.rfind('.') {
+        Some(dot) if !rel[dot..].contains('/') => dot,
+        _ => rel.len(),
+    };
+    Some(rel[..stem_end].to_string())
+}
+
+/// Unreal's `SaveStringToFile` writes UTF-16LE with a BOM whenever the text isn't pure ANSI,
+/// otherwise plain bytes, so accept both (and a UTF-8 BOM).
+fn decode_ue_text(bytes: &[u8]) -> String {
+    if let Some(rest) = bytes.strip_prefix(&[0xFF, 0xFE]) {
+        let units: Vec<u16> = rest.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+        return String::from_utf16_lossy(&units);
+    }
+    String::from_utf8_lossy(bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes)).into_owned()
+}
+
+/// `None` when the file is not a complete write (no trailing `end`) or has an unknown state.
+fn parse_galacta_mod_state(text: &str) -> Option<(bool, Vec<String>)> {
+    let mut tokens: Vec<&str> = text.trim().split('|').collect();
+    if tokens.pop()? != "end" {
+        return None;
+    }
+    let mounted = match *tokens.first()? {
+        "mounted" => true,
+        "unmounted" => false,
+        _ => return None,
+    };
+    // An empty mount set is written as `mounted||end`, hence the empty-token filter.
+    let keys = tokens[1..]
+        .iter()
+        .filter(|t| !t.is_empty())
+        .filter_map(|t| galacta_mod_key(t))
+        .collect();
+    Some((mounted, keys))
+}
+
+#[tauri::command]
+async fn get_galacta_mod_state() -> Result<GalactaModState, String> {
+    let Some(game_start) = game_process_start_time() else {
+        return Ok(GalactaModState::NotRunning);
+    };
+    let Some(path) = galacta_saved_dir().map(|d| d.join(GALACTA_STATE_FILE)) else {
+        return Ok(GalactaModState::NoInfo);
+    };
+    // A file older than the game process is left over from an earlier session.
+    let fresh = std::fs::metadata(&path)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .is_some_and(|t| t.as_secs() >= game_start);
+    if !fresh {
+        return Ok(GalactaModState::NoInfo);
+    }
+    Ok(std::fs::read(&path)
+        .ok()
+        .and_then(|bytes| parse_galacta_mod_state(&decode_ue_text(&bytes)))
+        .map_or(GalactaModState::NoInfo, |(mounted, keys)| GalactaModState::Live { mounted, keys }))
+}
+
+/// Key name from `Galacta_ModToggleKey.galacta` (`<option index>|<key name>`, e.g. `5|L`).
+/// Galacta only writes it once the setting is changed, so a missing file means the default F7.
+fn parse_galacta_toggle_key(text: &str) -> Option<String> {
+    let name = text.trim().split_once('|')?.1.trim();
+    (!name.is_empty()).then(|| name.to_string())
+}
+
+#[tauri::command]
+async fn get_galacta_toggle_key() -> Result<String, String> {
+    Ok(galacta_saved_dir()
+        .and_then(|d| std::fs::read(d.join("Galacta_ModToggleKey.galacta")).ok())
+        .and_then(|bytes| parse_galacta_toggle_key(&decode_ue_text(&bytes)))
+        .unwrap_or_else(|| "F7".to_string()))
+}
+
+/// Keeps the Saved-dir watcher alive for the app's lifetime.
+struct GalactaWatcher(#[allow(dead_code)] Mutex<Option<RecommendedWatcher>>);
+
+/// Emits `galacta_mod_state_changed` whenever Galacta rewrites its state file, so locks
+/// update the moment the Mod Toggle Key is pressed instead of on the next game-running poll.
+fn start_galacta_state_watcher(app: &tauri::AppHandle) -> Option<RecommendedWatcher> {
+    let dir = galacta_saved_dir().filter(|d| d.is_dir())?;
+    let handle = app.clone();
+    let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
+        let Ok(event) = res else { return };
+        let touches_state = event.paths.iter().any(|p| {
+            p.file_name()
+                .is_some_and(|n| n.to_string_lossy().eq_ignore_ascii_case(GALACTA_STATE_FILE))
+        });
+        if touches_state && matches!(event.kind, EventKind::Create(_) | EventKind::Modify(_)) {
+            let _ = handle.emit("galacta_mod_state_changed", ());
+        }
+    })
+    .map_err(|e| warn!("Galacta state watcher unavailable: {}", e))
+    .ok()?;
+    watcher
+        .watch(&dir, RecursiveMode::NonRecursive)
+        .map_err(|e| warn!("Failed to watch {:?}: {}", dir, e))
+        .ok()?;
+    Some(watcher)
+}
+
 fn is_game_process_running() -> bool {
+    game_process_start_time().is_some()
+}
+
+/// Start time (seconds since the Unix epoch) of the running game process, if any.
+/// Uses exe() path as primary method, falls back to name() matching
+fn game_process_start_time() -> Option<u64> {
     use sysinfo::{ProcessRefreshKind, RefreshKind, System};
 
     // Create system with full process info including exe path
@@ -5228,7 +5396,7 @@ fn is_game_process_running() -> bool {
         if let Some(exe_path) = process.exe() {
             if let Some(file_name) = exe_path.file_name() {
                 if file_name.to_string_lossy().to_lowercase() == game_exe_name {
-                    return true;
+                    return Some(process.start_time());
                 }
             }
         }
@@ -5237,17 +5405,60 @@ fn is_game_process_running() -> bool {
         for arg in process.cmd() {
             let arg = arg.to_str().unwrap_or("").to_string();
             if arg.to_lowercase().contains(game_exe_name) {
-                return true;
+                return Some(process.start_time());
             }
         }
         // Fallback: Check process name() directly
         let process_name = process.name().to_string_lossy().to_lowercase();
         if process_name == game_exe_name {
-            return true;
+            return Some(process.start_time());
         }
     }
 
-    false
+    None
+}
+
+#[cfg(test)]
+mod galacta_mode_tests {
+    use super::*;
+
+    #[test]
+    fn parses_state_file() {
+        let text = "mounted|../../../Marvel/Content/Paks/~mods/Riri/BW500_HideMask_99999999_P.pak|../../../Marvel/Content/Paks/PG_Root_P.pak|end\r\n";
+        assert_eq!(
+            parse_galacta_mod_state(text),
+            Some((true, vec!["riri/bw500_hidemask_99999999_p".to_string()]))
+        );
+        assert_eq!(parse_galacta_mod_state("mounted||end"), Some((true, vec![])));
+        assert_eq!(parse_galacta_mod_state("unmounted|end"), Some((false, vec![])));
+        assert_eq!(parse_galacta_mod_state("mounted|../~mods/a.pak"), None); // partial write
+        assert_eq!(parse_galacta_mod_state(""), None);
+    }
+
+    #[test]
+    fn parses_toggle_key() {
+        assert_eq!(parse_galacta_toggle_key("5|L"), Some("L".to_string()));
+        assert_eq!(parse_galacta_toggle_key("3|PageUp\r\n"), Some("PageUp".to_string()));
+        assert_eq!(parse_galacta_toggle_key("F7"), None);
+        assert_eq!(parse_galacta_toggle_key("0|"), None);
+    }
+
+    #[test]
+    fn decodes_utf16_state_file() {
+        let mut bytes = vec![0xFF, 0xFE];
+        bytes.extend("unmounted|end".encode_utf16().flat_map(|u| u.to_le_bytes()));
+        assert_eq!(decode_ue_text(&bytes), "unmounted|end");
+        assert_eq!(decode_ue_text(b"\xEF\xBB\xBFmounted||end"), "mounted||end");
+        assert_eq!(decode_ue_text(b"mounted||end"), "mounted||end");
+    }
+
+    #[test]
+    fn keys_match_disabled_forms() {
+        let key = Some("sub.dir/mod_p".to_string());
+        assert_eq!(galacta_mod_key(r"C:\Game\Paks\~mods\Sub.Dir\Mod_P.bak_repak"), key);
+        assert_eq!(galacta_mod_key(r"C:\Game\Paks\~mods\Sub.Dir\Mod_P.pak_disabled"), key);
+        assert_eq!(galacta_mod_key("../~mods/Sub.Dir/Mod_P.pak"), key);
+    }
 }
 
 /// Launch Marvel Rivals via Steam, temporarily skipping the launcher
@@ -8899,6 +9110,8 @@ fn main() {
             ui_log::init(app.handle().clone());
             emit_session_banner(app);
 
+            app.manage(GalactaWatcher(Mutex::new(start_galacta_state_watcher(app.handle()))));
+
             #[cfg(any(windows, target_os = "linux"))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
@@ -8997,6 +9210,8 @@ fn main() {
             find_project_galacta_in_paks,
             quick_organize_locked,
             check_game_running,
+            get_galacta_mod_state,
+            get_galacta_toggle_key,
             launch_game,
             skip_launcher_patch,
             get_skip_launcher_status,

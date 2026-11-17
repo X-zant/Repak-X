@@ -36,6 +36,7 @@ import { GiLightningTrio } from "react-icons/gi"
 import Checkbox from './components/ui/Checkbox'
 import ModDetailsPanel from './components/ModDetailsPanel'
 import ModsList from './components/ModsList'
+import type { GalactaLoadState } from './components/ModsList'
 import FileTree from './components/FileTree'
 import FolderTree from './components/FolderTree'
 import { VFX_WINDOW_WIDTH, VFX_WINDOW_HEIGHT } from './modules/vfx-updater/types'
@@ -240,9 +241,26 @@ type AppSettings = {
   holdToDelete: boolean
   showSubfolderMods: boolean
   bypassGameRunningLock: boolean
+  galactaMode: boolean
   allowModOverwrite: boolean
   launcherType: 'steam' | 'epic'
   enableAnimations: boolean
+}
+
+/** Mirrors `GalactaModState` in main_tauri.rs. */
+type GalactaModState =
+  | { status: 'notRunning' }
+  | { status: 'noInfo' }
+  | { status: 'live'; mounted: boolean; keys: string[] }
+
+/** Same key as `galacta_mod_key` in main_tauri.rs: lowercase path after `~mods/`, no extension. */
+const galactaModKey = (path: string): string | null => {
+  const p = path.replace(/\\/g, '/').toLowerCase()
+  const i = p.lastIndexOf('~mods/')
+  if (i < 0) return null
+  const rel = p.slice(i + '~mods/'.length)
+  const dot = rel.lastIndexOf('.')
+  return dot > rel.lastIndexOf('/') ? rel.slice(0, dot) : rel
 }
 
 function App() {
@@ -260,6 +278,9 @@ function App() {
   const [parallelProcessing, setParallelProcessing] = useState(false);
   const [holdToDelete, setHoldToDelete] = useState(true);
   const [bypassGameRunningLock, setBypassGameRunningLock] = useState(false);
+  const [galactaMode, setGalactaMode] = useState(true);
+  const [galactaState, setGalactaState] = useState<GalactaModState>({ status: 'notRunning' });
+  const [galactaToggleKey, setGalactaToggleKey] = useState('F7');
   const [allowModOverwrite, setAllowModOverwrite] = useState(false);
   const [launcherType, setLauncherType] = useState<'steam' | 'epic'>('steam');
   const [enableAnimations, setEnableAnimations] = useState(true);
@@ -964,10 +985,10 @@ function App() {
   }
 
   const handleSetPriority = async (modPath: string, priority: number) => {
-    if (gameRunning && !bypassGameRunningLock) {
+    if (isModLocked(modPath)) {
       alert.warning(
         'Game Running',
-        'Cannot change priority while game is running.'
+        lockMessage('change priority')
       )
       return
     }
@@ -1188,11 +1209,11 @@ function App() {
   }
 
   const handleBulkToggle = async (enable: boolean) => {
-    if (selectedMods.size === 0 || (gameRunning && !bypassGameRunningLock)) {
-      if (gameRunning && !bypassGameRunningLock) alert.warning('Game Running', 'Cannot toggle mods while game is running.')
-      return
-    }
-    const targetMods = mods.filter(m => selectedMods.has(m.path) && m.enabled !== enable)
+    if (selectedMods.size === 0) return
+    const { free, locked } = splitLocked(mods.filter(m => selectedMods.has(m.path) && m.enabled !== enable).map(m => m.path))
+    warnSkippedLocked(locked)
+    const freeSet = new Set(free)
+    const targetMods = mods.filter(m => freeSet.has(m.path))
     if (targetMods.length === 0) return
 
     try {
@@ -1469,6 +1490,11 @@ function App() {
       loadFolders()
     })
 
+    // Project Galacta rewrote its mod state file (login pass or Mod Toggle Key)
+    const unlistenGalactaState = listen('galacta_mod_state_changed', () => {
+      checkGame()
+    })
+
     // Listen for mods received from browser extension via repakx:// protocol
     const unlistenExtensionMod = listen('extension-mod-received', async (event: any) => {
       const filePath = event.payload
@@ -1578,6 +1604,7 @@ function App() {
       unlistenDragDrop.then(f => f())
       unlistenFileDrop.then(f => f())
       unlistenDirChanged.then(f => f())
+      unlistenGalactaState.then(f => f())
       unlistenExtensionMod.then(f => f())
       unlistenExtensionError.then(f => f())
       unlistenToast.then(f => f())
@@ -2028,8 +2055,12 @@ function App() {
 
   const checkGame = async () => {
     try {
-      const running = await invoke('check_game_running') as any
-      setGameRunning(running)
+      // One process scan answers both "is the game running" and "what has Galacta mounted"
+      const state = await invoke('get_galacta_mod_state') as GalactaModState
+      setGameRunning(state.status !== 'notRunning')
+      // Keep the old object when nothing changed so the 5s poll doesn't re-render the list
+      setGalactaState(prev => JSON.stringify(prev) === JSON.stringify(state) ? prev : state)
+      if (state.status !== 'notRunning') invoke('get_galacta_toggle_key').then(k => setGalactaToggleKey(k as string)).catch(() => {})
     } catch (error) {
       console.error('Failed to check game status:', error)
     }
@@ -2122,10 +2153,10 @@ function App() {
   }
 
   const handleDeleteMod = async (modPath: string) => {
-    if (gameRunning && !bypassGameRunningLock) {
+    if (isModLocked(modPath)) {
       alert.warning(
         'Game Running',
-        'Cannot delete mods while game is running.'
+        lockMessage('delete')
       )
       return
     }
@@ -2150,10 +2181,10 @@ function App() {
 
   const togglingModsRef = useRef<Set<string>>(new Set())
   const handleToggleMod = async (modPath: string) => {
-    if (gameRunning && !bypassGameRunningLock) {
+    if (isModLocked(modPath)) {
       alert.warning(
         'Game Running',
-        'Cannot toggle mods while game is running.'
+        lockMessage('toggle')
       )
       return
     }
@@ -2223,7 +2254,8 @@ function App() {
     const paths = newFolderPrompt.paths || []
     const moveFolderId = newFolderPrompt.moveFolderId
     const parentId = newFolderPrompt.parentId
-    const moveModPaths = newFolderPrompt.moveModPaths || []
+    const requestedMovePaths = newFolderPrompt.moveModPaths || []
+    const { free: moveModPaths, locked: lockedMovePaths } = splitLocked(requestedMovePaths)
     const pathCount = paths.length
     const pathsCopy = [...paths]
 
@@ -2231,7 +2263,7 @@ function App() {
     const isQuickOrganize = pathCount > 0
     const isMoveAfterCreate = !!moveFolderId
     // "Move to... > New Folder" on mods: create the folder, then move them in
-    const isMoveModsAfterCreate = moveModPaths.length > 0
+    const isMoveModsAfterCreate = requestedMovePaths.length > 0
 
     let finalFolderName = folderName
     if (parentId) {
@@ -2241,16 +2273,19 @@ function App() {
       }
     }
 
-    if ((isMoveAfterCreate || isMoveModsAfterCreate) && gameRunning && !bypassGameRunningLock) {
+    if ((isMoveAfterCreate && isFolderLocked(moveFolderId)) || (isMoveModsAfterCreate && moveModPaths.length === 0)) {
       setNewFolderPrompt(null)
       alert.warning(
         'Game Running',
         isMoveModsAfterCreate
-          ? 'Cannot move mods while game is running.'
-          : 'Cannot move folders while game is running.'
+          ? lockMessage('move')
+          : galactaLive
+            ? `This folder holds mods the game has loaded. Press ${toggleKeyText} in game to unload them first.`
+            : 'Cannot move folders while game is running.'
       )
       return
     }
+    warnSkippedLocked(lockedMovePaths)
 
     setNewFolderPrompt(null) // Close the modal
 
@@ -2411,10 +2446,12 @@ function App() {
   }
 
   const handleMoveFolder = async (folderId: string, newParentId: string | null) => {
-    if (gameRunning && !bypassGameRunningLock) {
+    if (isFolderLocked(folderId)) {
       alert.warning(
         'Game Running',
-        'Cannot move folders while game is running.'
+        galactaLive
+          ? `This folder holds mods the game has loaded. Press ${toggleKeyText} in game to unload them first.`
+          : 'Cannot move folders while game is running.'
       )
       return
     }
@@ -2501,18 +2538,17 @@ function App() {
   }
 
   const handleAssignToFolder = async (folderId: string | null) => {
-    if (gameRunning && !bypassGameRunningLock) {
-      alert.warning(
-        'Game Running',
-        'Cannot move mods while game is running.'
-      )
-      return
-    }
-
     if (selectedMods.size === 0) {
       setStatus('No mods selected')
       return
     }
+
+    const { free: movePaths, locked } = splitLocked(selectedMods)
+    if (movePaths.length === 0) {
+      alert.warning('Game Running', lockMessage('move'))
+      return
+    }
+    warnSkippedLocked(locked)
 
     // Check if folderId corresponds to the root folder (depth 0)
     // If so, pass null to backend to move to root
@@ -2523,10 +2559,10 @@ function App() {
     setSelectedMod(null)
 
     try {
-      for (const modPath of selectedMods) {
+      for (const modPath of movePaths) {
         await invoke('assign_mod_to_folder', { modPath, folderId: effectiveFolderId })
       }
-      setStatus(`Moved ${selectedMods.size} mod(s) to folder!`)
+      setStatus(`Moved ${movePaths.length} mod(s) to folder!`)
       setSelectedMods(new Set())
       await loadMods()
       await loadFolders()
@@ -2536,10 +2572,10 @@ function App() {
   }
 
   const handleMoveSingleMod = async (modPath: string, folderId: string | null) => {
-    if (gameRunning && !bypassGameRunningLock) {
+    if (isModLocked(modPath)) {
       alert.warning(
         'Game Running',
-        'Cannot move mods while game is running.'
+        lockMessage('move')
       )
       return
     }
@@ -2675,10 +2711,10 @@ function App() {
 
   // Rename a mod (calls backend to rename actual file)
   const handleRenameMod = async (modPath: string, newName: string) => {
-    if (gameRunning && !bypassGameRunningLock) {
+    if (isModLocked(modPath)) {
       alert.warning(
         'Game Running',
-        'Cannot rename mods while game is running.'
+        lockMessage('rename')
       )
       return
     }
@@ -2712,10 +2748,10 @@ function App() {
   const stableRenameMod = useStableCallback(handleRenameMod)
   const stableClearRenaming = useStableCallback(() => setRenamingModPath(null))
   const stableRenameBlocked = useStableCallback(() =>
-    alert.warning('Game Running', 'Cannot rename mods while game is running.')
+    alert.warning('Game Running', lockMessage('rename'))
   )
   const stableDeleteBlocked = useStableCallback(() =>
-    alert.warning('Game Running', 'Cannot delete mods while game is running.')
+    alert.warning('Game Running', lockMessage('delete'))
   )
 
   // Handle installing a mod received from the browser extension
@@ -2962,6 +2998,62 @@ function App() {
   // once at mount and otherwise stuck reading a stale value.
   projectGalactaModRef.current = projectGalactaMod
 
+  // Galacta Mode: while the game runs, only the paks Project Galacta reports as
+  // mounted stay locked. No fresh state file (or the mode is off) keeps the old
+  // lock-everything behaviour.
+  // Bypass switches the mode off entirely (no locks, badges or pill)
+  const galactaLive = (galactaMode && !bypassGameRunningLock && projectGalactaMod && galactaState.status === 'live') ? galactaState : null
+  // Galacta's key names are Unreal's (PageUp, Semicolon); show them the way a keyboard does
+  const KEY_LABELS: Record<string, string> = { PageUp: 'Page Up', PageDown: 'Page Down', Semicolon: ';' }
+  const toggleKeyText = `the Mod Toggle Key (${KEY_LABELS[galactaToggleKey] ?? galactaToggleKey})`
+  const galactaMountedKeys = new Set(galactaLive?.mounted ? galactaLive.keys : [])
+  const isModMounted = (modPath: string) => galactaMountedKeys.has(galactaModKey(modPath) ?? '')
+  const isModLocked = (modPath: string) => {
+    if (!gameRunning || bypassGameRunningLock) return false
+    if (!galactaLive) return true
+    // Galacta itself is never unmounted by the Mod Toggle Key
+    return modPath === projectGalactaMod?.path || isModMounted(modPath)
+  }
+  // Suffix for the "Game Running" launch button while Galacta Mode is in effect
+  const galactaStatus = (gameRunning && galactaMode && !bypassGameRunningLock && projectGalactaMod)
+    ? galactaLive
+      ? galactaLive.mounted
+        ? { label: `${galactaLive.keys.length} loaded`, title: 'Only mods the game has loaded are locked' }
+        : { label: 'mods unloaded', title: `Mods were unloaded with ${toggleKeyText}: everything can be changed` }
+      : { label: 'waiting for login', title: 'No mod list from this game session yet, so everything stays locked' }
+    : null
+
+  // Badges only make sense while Galacta has mods loaded (after toggling mods off nothing is)
+  const galactaLoadState = (modPath: string, enabled?: boolean): GalactaLoadState => {
+    if (!gameRunning || !galactaLive?.mounted) return null
+    if (isModMounted(modPath)) return 'loaded'
+    return enabled ? 'notLoaded' : null
+  }
+  const isFolderLocked = (folderId: string) => {
+    const prefix = folderId.toLowerCase() + '/'
+    return mods.some(m => (galactaModKey(m.path) ?? '').startsWith(prefix) && isModLocked(m.path))
+  }
+  /** Splits paths into ones that may be changed and the display names of locked ones. */
+  const splitLocked = (paths: Iterable<string>) => {
+    const free: string[] = []
+    const locked: string[] = []
+    for (const p of paths) {
+      if (isModLocked(p)) locked.push(p.split(/[/\\]/).pop() || p)
+      else free.push(p)
+    }
+    return { free, locked }
+  }
+  const lockMessage = (action: string) => galactaLive
+    ? `Cannot ${action} a mod the game has loaded. Press ${toggleKeyText} in game to unload mods first.`
+    : `Cannot ${action} mods while game is running.`
+  const warnSkippedLocked = (locked: string[]) => {
+    if (locked.length === 0) return
+    alert.warning(
+      'Loaded In Game',
+      `Skipped ${locked.length} mod(s) the game has loaded: ${locked.slice(0, 5).join(', ')}${locked.length > 5 ? '…' : ''}`
+    )
+  }
+
   // Compute base filtered mods (excluding folder filter)
   const baseFilteredMods = mods.filter(mod => {
     // Project Galacta is managed from its own Tools panel toggle, not the mods list
@@ -3102,10 +3194,10 @@ function App() {
       // F2 - Rename mod
       else if (key === 'f2' && selectedMod) {
         e.preventDefault()
-        if (gameRunning && !bypassGameRunningLock) {
+        if (isModLocked(selectedMod.path)) {
           alert.warning(
             'Game Running',
-            'Cannot rename mods while game is running.'
+            lockMessage('rename')
           )
           return
         }
@@ -3372,6 +3464,7 @@ function App() {
     const newHoldToDelete = overrides.holdToDelete !== undefined ? overrides.holdToDelete : holdToDelete;
     const newShowSubfolderMods = overrides.showSubfolderMods !== undefined ? overrides.showSubfolderMods : showSubfolderMods;
     const newBypassGameRunningLock = overrides.bypassGameRunningLock !== undefined ? overrides.bypassGameRunningLock : bypassGameRunningLock;
+    const newGalactaMode = overrides.galactaMode !== undefined ? overrides.galactaMode : galactaMode;
     const newAllowModOverwrite = overrides.allowModOverwrite !== undefined ? overrides.allowModOverwrite : allowModOverwrite;
     const newLauncherType = overrides.launcherType !== undefined ? overrides.launcherType : launcherType;
     const newEnableAnimations = overrides.enableAnimations !== undefined ? overrides.enableAnimations : enableAnimations;
@@ -3396,6 +3489,7 @@ function App() {
       holdToDelete: newHoldToDelete,
       showSubfolderMods: newShowSubfolderMods,
       bypassGameRunningLock: newBypassGameRunningLock,
+      galactaMode: newGalactaMode,
       allowModOverwrite: newAllowModOverwrite,
       launcherType: newLauncherType,
       enableAnimations: newEnableAnimations,
@@ -3434,6 +3528,7 @@ function App() {
     if (overrides.holdToDelete !== undefined) setHoldToDelete(newHoldToDelete);
     if (overrides.showSubfolderMods !== undefined) setShowSubfolderMods(newShowSubfolderMods);
     if (overrides.bypassGameRunningLock !== undefined) setBypassGameRunningLock(newBypassGameRunningLock);
+    if (overrides.galactaMode !== undefined) setGalactaMode(newGalactaMode);
     if (overrides.allowModOverwrite !== undefined) setAllowModOverwrite(newAllowModOverwrite);
     if (overrides.launcherType !== undefined) setLauncherType(newLauncherType);
     if (overrides.enableAnimations !== undefined) setEnableAnimations(newEnableAnimations);
@@ -3510,6 +3605,7 @@ function App() {
         setHoldToDelete(settings.holdToDelete);
         setShowSubfolderMods(settings.showSubfolderMods);
         setBypassGameRunningLock(settings.bypassGameRunningLock);
+        setGalactaMode(settings.galactaMode !== false);
         setAllowModOverwrite(settings.allowModOverwrite);
         setEnableDrp(settings.enableDrp);
         if (settings.launcherType) setLauncherType(settings.launcherType);
@@ -3603,7 +3699,8 @@ function App() {
 
       {panels.settings && (
         <SettingsPanel
-          settings={{ hideSuffix, autoOpenDetails, showHeroIcons, showHeroBg, showModType, showExperimental, enableDrp, parallelProcessing, autoCheckUpdates, holdToDelete, showSubfolderMods, bypassGameRunningLock, allowModOverwrite, launcherType, enableAnimations }}
+          settings={{ hideSuffix, autoOpenDetails, showHeroIcons, showHeroBg, showModType, showExperimental, enableDrp, parallelProcessing, autoCheckUpdates, holdToDelete, showSubfolderMods, bypassGameRunningLock, galactaMode, allowModOverwrite, launcherType, enableAnimations }}
+          galactaDetected={!!projectGalactaMod}
           onSave={handleSaveSettings}
           onClose={() => setPanel('settings', false)}
           theme={theme}
@@ -3816,7 +3913,7 @@ function App() {
           <button
             className="btn-settings"
             data-tour="launch-btn"
-            title={gameRunning ? "Game is currently running" : "Launch Rivals"}
+            title={gameRunning ? (galactaStatus?.title ?? "Game is currently running") : "Launch Rivals"}
             style={{
               background: gameRunning
                 ? 'rgba(255, 152, 0, 0.15)'
@@ -3857,6 +3954,7 @@ function App() {
                   exit={{ opacity: 0, scale: 0.5 }}
                 >
                   <span className="blink-icon"><IoMdWarning /></span> Game Running
+                  {galactaStatus && <span className="galacta-launch-status">({galactaStatus.label})</span>}
                 </motion.span>
               ) : launchSuccess ? (
                 <motion.span
@@ -4321,6 +4419,7 @@ function App() {
               </div>
 
               <ModsList
+                key={selectedFolderId /* remount so every card replays its entry animation on folder switch */}
                 mods={filteredMods}
                 viewMode={viewMode}
                 selectedMod={selectedMod}
@@ -4343,7 +4442,9 @@ function App() {
                 renamingModPath={renamingModPath}
                 onClearRenaming={stableClearRenaming}
                 gridRef={modsGridRef}
-                gameRunning={gameRunning && !bypassGameRunningLock}
+                isModLocked={isModLocked}
+                toggleKeyText={toggleKeyText}
+                galactaLoadState={galactaLoadState}
                 holdToDelete={holdToDelete}
                 enableAnimations={enableAnimations}
                 onRenameBlocked={stableRenameBlocked}
@@ -4457,10 +4558,10 @@ function App() {
             onToggle={() => contextMenu.mod && handleToggleMod(contextMenu.mod.path)}
             onRename={() => {
               if (contextMenu.mod) {
-                if (gameRunning && !bypassGameRunningLock) {
+                if (isModLocked(contextMenu.mod.path)) {
                   alert.warning(
                     'Game Running',
-                    'Cannot rename mods while game is running.'
+                    lockMessage('rename')
                   )
                   return
                 }

@@ -55,6 +55,7 @@ type SettingsPayload = {
   holdToDelete: boolean;
   showSubfolderMods: boolean;
   bypassGameRunningLock: boolean;
+  galactaMode: boolean;
   allowModOverwrite: boolean;
   launcherType: 'steam' | 'epic';
   enableAnimations: boolean;
@@ -78,10 +79,12 @@ type SettingsPanelProps = {
   isCheckingUpdates: boolean;
   onReplayTour: () => void;
   onOpenShortcuts: () => void;
+  /** Project Galacta is installed (Galacta Mode needs it to write the mod state file). */
+  galactaDetected: boolean;
 };
 
 
-export default function SettingsPanel({ settings, onSave, onClose, theme, setTheme, accentColor, setAccentColor, gamePath, onAutoDetectGamePath, onBrowseGamePath, isGamePathLoading, setParallelProcessing, onCheckForUpdates, onViewChangelog, isCheckingUpdates, onReplayTour, onOpenShortcuts }: SettingsPanelProps) {
+export default function SettingsPanel({ settings, onSave, onClose, theme, setTheme, accentColor, setAccentColor, gamePath, onAutoDetectGamePath, onBrowseGamePath, isGamePathLoading, setParallelProcessing, onCheckForUpdates, onViewChangelog, isCheckingUpdates, onReplayTour, onOpenShortcuts, galactaDetected }: SettingsPanelProps) {
   const alert = useAlert();
   const [activeCategory, setActiveCategory] = useState<CategoryId>('general');
   const [hideSuffix, setHideSuffix] = useState(settings.hideSuffix || false);
@@ -95,6 +98,7 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
   const [holdToDelete, setHoldToDelete] = useState(settings.holdToDelete !== false);
   const [showSubfolderMods, setShowSubfolderMods] = useState(settings.showSubfolderMods !== false);
   const [bypassGameRunningLock, setBypassGameRunningLock] = useState(settings.bypassGameRunningLock || false);
+  const [galactaMode, setGalactaMode] = useState(settings.galactaMode !== false);
   const [allowModOverwrite, setAllowModOverwrite] = useState(settings.allowModOverwrite || false);
   const [enableDrp, setEnableDrp] = useState(settings.enableDrp !== false);
   const [launcherType, setLauncherType] = useState<'steam' | 'epic'>(settings.launcherType || 'steam');
@@ -124,6 +128,7 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
       holdToDelete,
       showSubfolderMods,
       bypassGameRunningLock,
+      galactaMode,
       allowModOverwrite,
       launcherType,
       enableAnimations
@@ -150,6 +155,10 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
   useEffect(() => {
     setBypassGameRunningLock(settings.bypassGameRunningLock || false);
   }, [settings.bypassGameRunningLock]);
+
+  useEffect(() => {
+    setGalactaMode(settings.galactaMode !== false);
+  }, [settings.galactaMode]);
 
   useEffect(() => {
     setAllowModOverwrite(settings.allowModOverwrite || false);
@@ -467,6 +476,22 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
                         {bypassGameRunningLock
                           ? 'Warning: Rename, move, toggle, delete, and priority actions will stay enabled while the game is running.'
                           : 'When disabled, mod operations are blocked while the game is running.'}
+                      </p>
+                    </div>
+                    <div className="setting-item">
+                      <Checkbox
+                        checked={galactaDetected && !bypassGameRunningLock && galactaMode}
+                        isDisabled={!galactaDetected || bypassGameRunningLock}
+                        onChange={(checked: boolean) => setGalactaMode(checked)}
+                      >
+                        <span>Galacta Mode: smart game-running lock</span>
+                      </Checkbox>
+                      <p className="setting-subtext">
+                        {!galactaDetected
+                          ? 'Project Galacta not detected.'
+                          : bypassGameRunningLock
+                            ? 'Not needed while the game-running lock is bypassed.'
+                            : 'While the game is running, only mods Project Galacta has loaded stay locked. Mods unloaded with the Mod Toggle Key can be changed.'}
                       </p>
                     </div>
                   </div>
