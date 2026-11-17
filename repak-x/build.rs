@@ -41,7 +41,10 @@ fn linux_build() {
 
     // Use workspace_root to derive the CI-published binary path, because target_dir
     // includes the target triple when building with --target (cross-compilation).
-    let primary_src = workspace_root.join("target").join("uassettool").join("UAssetTool");
+    let primary_src = workspace_root
+        .join("target")
+        .join("uassettool")
+        .join("UAssetTool");
     let tools_dir = workspace_root
         .join("UAssetToolRivals")
         .join("src")
@@ -222,7 +225,10 @@ fn windows_build() {
     // Use workspace_root to derive the CI-published DLL path, because target_dir
     // includes the target triple when building with --target (cross-compilation),
     // which would give the wrong path (target/<triple>/uassettool instead of target/uassettool).
-    let primary_src = workspace_root.join("target").join("uassettool").join("UAssetTool.dll");
+    let primary_src = workspace_root
+        .join("target")
+        .join("uassettool")
+        .join("UAssetTool.dll");
     let tools_dir = workspace_root
         .join("UAssetToolRivals")
         .join("src")
@@ -259,7 +265,13 @@ fn windows_build() {
         None
     };
 
-    if let Some(src) = source {
+    // uasset_app's build.rs (runs first) already places a fresh library here; don't clobber it.
+    if dest_path.exists() {
+        println!(
+            "cargo:warning=UAssetTool.dll already at {}",
+            dest_path.display()
+        );
+    } else if let Some(src) = source {
         if let Err(e) = fs::create_dir_all(&dest_dir) {
             println!(
                 "cargo:warning=failed to create {}: {}",
