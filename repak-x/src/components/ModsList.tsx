@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, memo } from 'react'
+import React, { useState, useRef, useEffect, useLayoutEffect, memo } from 'react'
 import { motion } from 'framer-motion'
 import { Tooltip } from '@mui/material'
 import { RiDeleteBin2Fill } from 'react-icons/ri'
@@ -607,8 +607,26 @@ export default function ModsList({
         return stem
     }
 
+    // Entry stagger by visual row, not by card index: index-based delays ran out
+    // after 12 cards, which is 12 rows in list view but only 2 rows of a 6-wide
+    // grid, so the rest of the grid entered at once as a quick fade. Measured once
+    // before the first paint of a mount (the grid remounts per view and folder).
+    const wrapperRef = useRef<HTMLDivElement | null>(null)
+    useLayoutEffect(() => {
+        if (!enableAnimations) return
+        const grid = wrapperRef.current?.querySelector('.mod-list-grid')
+        if (!grid) return
+        const rowTops: number[] = []
+        for (const el of Array.from(grid.children) as HTMLElement[]) {
+            if (!el.classList.contains('mod-card')) continue
+            const top = el.offsetTop
+            if (rowTops[rowTops.length - 1] !== top) rowTops.push(top)
+            el.style.animationDelay = `${Math.min(rowTops.length - 1, 12) * 45}ms`
+        }
+    }, [viewMode]) // eslint-disable-line react-hooks/exhaustive-deps
+
     return (
-        <div className="mods-list-wrapper">
+        <div className="mods-list-wrapper" ref={wrapperRef}>
             <div
                 key={viewMode}
                 ref={gridRef}

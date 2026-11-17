@@ -20,6 +20,7 @@ mod ui_log;
 mod utils;
 mod utoc_utils;
 mod vfx_updater;
+mod trash;
 
 use log::{debug, error, info, warn};
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -72,6 +73,14 @@ fn default_accent() -> String {
 fn default_view_mode() -> String {
     "list".to_string()
 }
+fn default_ui_scale_existing() -> u32 {
+    100
+}
+
+fn default_trash_days() -> u32 {
+    7
+}
+
 fn default_true() -> bool {
     true
 }
@@ -157,6 +166,17 @@ struct AppState {
     launcher_type: String,
     #[serde(default = "default_true")]
     enable_animations: bool,
+    /// Whole-app zoom in percent; 0 = pick one for the screen. Only a new
+    /// install starts at 0 (AppState::default); a state.json saved before this
+    /// setting existed reads as 100, so existing users keep the size they had.
+    #[serde(default = "default_ui_scale_existing")]
+    ui_scale: u32,
+    /// Deleted mods go to Recently deleted (trash.rs) instead of being removed
+    #[serde(default = "default_true")]
+    trash_enabled: bool,
+    /// Days a deleted mod stays in Recently deleted
+    #[serde(default = "default_trash_days")]
+    trash_days: u32,
 
     custom_tag_catalog: Vec<String>,
     #[serde(default)]
@@ -212,6 +232,9 @@ impl Default for AppState {
             enable_drp: default_true(),
             launcher_type: default_launcher_type(),
             enable_animations: default_true(),
+            ui_scale: 0,
+            trash_enabled: true,
+            trash_days: default_trash_days(),
             custom_tag_catalog: Vec::new(),
             mod_tags: std::collections::HashMap::new(),
             last_known_crash_folder: None,
@@ -332,6 +355,17 @@ struct AppSettings {
     launcher_type: String,
     #[serde(default = "default_true")]
     enable_animations: bool,
+    /// Whole-app zoom in percent; 0 = pick one for the screen. Only a new
+    /// install starts at 0 (AppState::default); a state.json saved before this
+    /// setting existed reads as 100, so existing users keep the size they had.
+    #[serde(default = "default_ui_scale_existing")]
+    ui_scale: u32,
+    /// Deleted mods go to Recently deleted (trash.rs) instead of being removed
+    #[serde(default = "default_true")]
+    trash_enabled: bool,
+    /// Days a deleted mod stays in Recently deleted
+    #[serde(default = "default_trash_days")]
+    trash_days: u32,
 }
 
 #[tauri::command]
@@ -368,6 +402,9 @@ async fn get_app_settings(state: State<'_, Arc<Mutex<AppState>>>) -> Result<AppS
         enable_drp: state.enable_drp,
         launcher_type: state.launcher_type.clone(),
         enable_animations: state.enable_animations,
+        ui_scale: state.ui_scale,
+        trash_enabled: state.trash_enabled,
+        trash_days: state.trash_days,
     })
 }
 
@@ -400,6 +437,9 @@ async fn save_app_settings(
     state.enable_drp = settings.enable_drp;
     state.launcher_type = settings.launcher_type;
     state.enable_animations = settings.enable_animations;
+    state.ui_scale = settings.ui_scale;
+    state.trash_enabled = settings.trash_enabled;
+    state.trash_days = settings.trash_days.max(1);
 
     // Apply DRP immediately. The connect handshake can block for a while
     // (see discord_presence::connect), and this command's caller awaits the
@@ -3339,9 +3379,31 @@ async fn delete_mod(
     path: String,
     window: Window,
     state: State<'_, Arc<Mutex<AppState>>>,
-) -> Result<(), String> {
+) -> Result<Option<String>, String> {
     let path_buf = PathBuf::from(&path);
     log::info!("delete_mod called with path: {}", path);
+
+    // With Recently deleted on, the files move to the trash (trash.rs) and the
+    // returned id lets the toast's Undo put them back. Off: deleted for good.
+    let trash_enabled = state.lock().unwrap().trash_enabled;
+    let mut trash = if trash_enabled {
+        let name = path_buf.file_stem().unwrap_or_default().to_string_lossy().to_string();
+        match trash::TrashBatch::begin(&name) {
+            Ok(b) => Some(b),
+            Err(e) => {
+                log::warn!("Recently deleted unavailable, deleting for good: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+    let mut discard = |p: &Path| -> std::io::Result<()> {
+        match trash.as_mut() {
+            Some(b) => b.discard(p),
+            None => std::fs::remove_file(p),
+        }
+    };
 
     // Determine the actual file to delete - check both .pak and .bak_repak variants
     let (actual_path, is_disabled) = if path_buf.exists() {
@@ -3377,7 +3439,7 @@ async fn delete_mod(
 
     // Try to delete the main file
     if actual_path.exists() {
-        if let Err(e) = std::fs::remove_file(&actual_path) {
+        if let Err(e) = discard(&actual_path) {
             let error_msg = format!("Failed to delete mod file: {}", e);
             toast_events::emit_delete_failed(&window, &error_msg);
             return Err(error_msg);
@@ -3424,13 +3486,14 @@ async fn delete_mod(
             "Keeping IoStore files, still used by: {:?}",
             sibling_path
         );
-        return Ok(());
+        drop(discard);
+        return Ok(trash.and_then(|b| b.finish()));
     }
 
     // Delete associated IoStore files (.ucas and .utoc)
     let ucas_path = base_pak_path.with_extension("ucas");
     if ucas_path.exists() {
-        if let Err(e) = std::fs::remove_file(&ucas_path) {
+        if let Err(e) = discard(&ucas_path) {
             log::warn!("Failed to delete .ucas file: {}", e);
         } else {
             log::info!("Deleted associated .ucas file: {:?}", ucas_path);
@@ -3439,14 +3502,41 @@ async fn delete_mod(
 
     let utoc_path = base_pak_path.with_extension("utoc");
     if utoc_path.exists() {
-        if let Err(e) = std::fs::remove_file(&utoc_path) {
+        if let Err(e) = discard(&utoc_path) {
             log::warn!("Failed to delete .utoc file: {}", e);
         } else {
             log::info!("Deleted associated .utoc file: {:?}", utoc_path);
         }
     }
 
+    drop(discard);
+    Ok(trash.and_then(|b| b.finish()))
+}
+
+/// Settings > Recently deleted: every deletion still in the trash, newest first.
+#[tauri::command]
+fn list_recently_deleted() -> Vec<trash::TrashEntry> {
+    trash::list()
+}
+
+/// Put a deletion back where it was (the delete toast's Undo, or the list's Restore).
+#[tauri::command]
+async fn restore_recently_deleted(id: String, window: Window) -> Result<(), String> {
+    trash::restore(&id)?;
+    let _ = window.emit("mods_dir_changed", ());
     Ok(())
+}
+
+/// Delete one entry for good, or all of them when no id is given.
+#[tauri::command]
+fn purge_recently_deleted(id: Option<String>) -> Result<(), String> {
+    match id {
+        Some(id) => trash::purge(&id),
+        None => {
+            trash::purge_all();
+            Ok(())
+        }
+    }
 }
 
 /// Result of an update_mod operation
@@ -8217,6 +8307,82 @@ struct SingleModConflict {
     affected_characters: Vec<String>,
 }
 
+/// The same mod installed more than once (a copy under another name or folder).
+/// Groups of mod paths, each with the copy to keep first: an enabled one if any.
+///
+/// Byte sizes of the .pak/.utoc/.ucas must match exactly, and only those
+/// candidates get their file lists read to confirm, so this costs one stat per
+/// mod plus a list read per likely duplicate. Two different mods with identical
+/// sizes and identical file lists are not realistic.
+#[tauri::command]
+async fn find_duplicate_mods(
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<Vec<Vec<String>>, String> {
+    use std::collections::HashMap;
+
+    let game_path = state.lock().unwrap().game_path.clone();
+    if !game_path.exists() {
+        return Ok(Vec::new());
+    }
+    let size = |p: &Path| std::fs::metadata(p).map(|m| m.len()).ok();
+
+    let mut by_size: HashMap<(u64, Option<u64>, Option<u64>), Vec<PathBuf>> = HashMap::new();
+    for entry in WalkDir::new(&game_path).into_iter().filter_map(|e| e.ok()) {
+        let path = entry.path();
+        let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
+        if !path.is_file() || (ext != "pak" && ext != "bak_repak") {
+            continue;
+        }
+        // Companions are named after the .pak even while the mod is off
+        let base = path.with_extension("pak");
+        let Some(pak_size) = size(path) else { continue };
+        let key = (pak_size, size(&base.with_extension("utoc")), size(&base.with_extension("ucas")));
+        by_size.entry(key).or_default().push(path.to_path_buf());
+    }
+
+    let file_list = |path: &Path| -> Option<Vec<String>> {
+        let utoc = path.with_extension("pak").with_extension("utoc");
+        let files: Vec<String> = if utoc.exists() {
+            crate::utoc_utils::read_utoc(&utoc)
+                .iter()
+                .map(|e| e.file_path.clone())
+                .collect()
+        } else {
+            uasset_toolkit::list_pak_files(
+                path.to_str().unwrap_or_default(),
+                Some(crate::install_mod::AES_KEY_HEX),
+            )
+            .ok()?
+        };
+        let mut files: Vec<String> = files
+            .iter()
+            .map(|f| asset_explorer::normalize_asset_path(f).to_lowercase())
+            .collect();
+        files.sort();
+        Some(files)
+    };
+
+    let mut groups = Vec::new();
+    for (_, candidates) in by_size.into_iter().filter(|(_, v)| v.len() > 1) {
+        let mut by_files: HashMap<Vec<String>, Vec<PathBuf>> = HashMap::new();
+        for p in candidates {
+            // An empty or unreadable list proves nothing: never call those duplicates
+            if let Some(files) = file_list(&p).filter(|f| !f.is_empty()) {
+                by_files.entry(files).or_default().push(p);
+            }
+        }
+        for (_, mut same) in by_files.into_iter().filter(|(_, v)| v.len() > 1) {
+            // Keep an enabled copy, then the shortest path (usually the original)
+            same.sort_by_key(|p| {
+                let off = p.extension().and_then(|e| e.to_str()) == Some("bak_repak");
+                (off, p.as_os_str().len())
+            });
+            groups.push(same.iter().map(|p| p.to_string_lossy().to_string()).collect());
+        }
+    }
+    Ok(groups)
+}
+
 #[tauri::command]
 async fn check_mod_clashes(
     state: State<'_, Arc<Mutex<AppState>>>,
@@ -9174,7 +9340,41 @@ fn main() {
 
             // Work folders a closed or crashed run left in %TEMP%/repak-x (VFX
             // Updater steps, archive unpacks). Nothing can be using them yet.
-            std::thread::spawn(|| {
+            // Recently deleted entries past their retention go at the same time.
+            // UI scale before the page draws, so it never shows at 100% and then jumps.
+            // Same thresholds as autoUiScale() in utils/uiScale.ts, which the frontend
+            // re-applies (to the same value) once settings load.
+            let ui_scale = app
+                .state::<Arc<Mutex<AppState>>>()
+                .lock()
+                .map(|s| s.ui_scale)
+                .unwrap_or(100);
+            if let Some(window) = app.get_webview_window("main") {
+                let percent = if ui_scale > 0 {
+                    ui_scale
+                } else {
+                    window
+                        .current_monitor()
+                        .ok()
+                        .flatten()
+                        .map(|m| {
+                            let logical_width = m.size().width as f64 / m.scale_factor();
+                            if logical_width < 1700.0 { 90 } else if logical_width < 2300.0 { 100 } else { 110 }
+                        })
+                        .unwrap_or(100)
+                };
+                if let Err(e) = window.set_zoom(percent as f64 / 100.0) {
+                    warn!("Could not apply UI scale: {}", e);
+                }
+            }
+
+            let trash_days = app
+                .state::<Arc<Mutex<AppState>>>()
+                .lock()
+                .map(|s| s.trash_days)
+                .unwrap_or_else(|_| default_trash_days());
+            std::thread::spawn(move || {
+                trash::purge_expired(trash_days.max(1));
                 if let Err(e) = vfx_updater::file_ops::cleanup_vfx_temp_directories() {
                     warn!("Startup temp cleanup (VFX): {}", e);
                 }
@@ -9260,6 +9460,9 @@ fn main() {
             set_last_seen_version,
             delete_source_archive,
             delete_mod,
+            list_recently_deleted,
+            restore_recently_deleted,
+            purge_recently_deleted,
             update_mod,
             rename_mod,
             open_in_explorer,
@@ -9308,6 +9511,7 @@ fn main() {
             get_mod_details,
             set_mod_priority,
             check_mod_clashes,
+            find_duplicate_mods,
             get_asset_explorer_index,
             check_single_mod_conflicts,
             extract_pak_to_destination,

@@ -7,6 +7,8 @@ import { listen } from '@tauri-apps/api/event'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useDebouncedCallback } from 'use-debounce'
 import { IconButton, Tooltip } from '@mui/material'
+import { getCurrentWebview } from '@tauri-apps/api/webview'
+import { autoUiScale } from './utils/uiScale'
 import {
   Refresh as RefreshIcon,
   CreateNewFolder as CreateNewFolderIcon,
@@ -245,6 +247,9 @@ type AppSettings = {
   allowModOverwrite: boolean
   launcherType: 'steam' | 'epic'
   enableAnimations: boolean
+  uiScale: number
+  trashEnabled: boolean
+  trashDays: number
 }
 
 /** Mirrors `GalactaModState` in main_tauri.rs. */
@@ -284,10 +289,35 @@ function App() {
   const [allowModOverwrite, setAllowModOverwrite] = useState(false);
   const [launcherType, setLauncherType] = useState<'steam' | 'epic'>('steam');
   const [enableAnimations, setEnableAnimations] = useState(true);
+  // Whole-app zoom in percent; 0 = picked from the screen (autoUiScale)
+  // null until settings load, so an existing user never sees the Auto size flash first
+  const [uiScale, setUiScale] = useState<number | null>(null);
+  // Recently deleted (trash.rs): deletes move to a trash folder for trashDays days
+  const [trashEnabled, setTrashEnabled] = useState(true);
+  const [trashDays, setTrashDays] = useState(7);
+  useEffect(() => {
+    if (uiScale === null) return;
+    getCurrentWebview().setZoom((uiScale || autoUiScale()) / 100).catch(console.warn);
+  }, [uiScale]);
   // CSS gates animations on [data-animations="off"]
   useEffect(() => {
     document.documentElement.setAttribute('data-animations', enableAnimations ? 'on' : 'off');
   }, [enableAnimations]);
+  // While the window is in the background (game focused, minimized) decorative
+  // loops pause via [data-app-bg] in theme.css; spinners and progress keep going.
+  useEffect(() => {
+    const update = () =>
+      document.documentElement.toggleAttribute('data-app-bg', document.hidden || !document.hasFocus())
+    update()
+    window.addEventListener('focus', update)
+    window.addEventListener('blur', update)
+    document.addEventListener('visibilitychange', update)
+    return () => {
+      window.removeEventListener('focus', update)
+      window.removeEventListener('blur', update)
+      document.removeEventListener('visibilitychange', update)
+    }
+  }, []);
   const [theme, setTheme] = useState('dark');
   const [accentColor, setAccentColor] = useState('#4a9eff');
   const [sortBy, setSortBy] = useState<'name' | 'modified'>('name');
@@ -1152,12 +1182,14 @@ function App() {
       const modPaths = Array.from(selectedMods)
       let deletedCount = 0
       let errors: string[] = []
+      const trashIds: string[] = []
 
       for (const path of modPaths) {
         try {
           // Find mod details to check if it's a folder mod or regular file
           // If we don't have details, try delete_mod anyway
-          await invoke('delete_mod', { path: path })
+          const trashId = await invoke('delete_mod', { path: path }) as string | null
+          if (trashId) trashIds.push(trashId)
           deletedCount++
         } catch (e) {
           console.error(`Failed to delete ${path}:`, e)
@@ -1170,8 +1202,8 @@ function App() {
           'Bulk Delete Incomplete',
           `Deleted ${deletedCount} mods. Failed to delete ${errors.length} mods.`
         )
-      } else {
-        alert.success('Bulk Delete', `Successfully deleted ${deletedCount} mods.`)
+      } else if (!offerUndoDelete(trashIds, `Deleted ${deletedCount} mod${deletedCount === 1 ? '' : 's'}`)) {
+        alert.success('Bulk Delete', `Deleted ${deletedCount} mod${deletedCount === 1 ? '' : 's'}.`)
       }
 
       setSelectedMods(new Set()) // Clear selection
@@ -2165,8 +2197,9 @@ function App() {
     try {
       // Pass the real path: delete_mod resolves the associated IoStore files itself, and
       // rewriting .bak_repak to .pak deleted the enabled copy when both exist.
-      await invoke('delete_mod', { path: modPath })
+      const trashId = await invoke('delete_mod', { path: modPath }) as string | null
       setStatus('Mod deleted')
+      offerUndoDelete(trashId ? [trashId] : [], 'Mod deleted')
 
       // Clear selection if the deleted mod was selected
       if (selectedMod && selectedMod.path === modPath) {
@@ -2177,6 +2210,27 @@ function App() {
     } catch (error) {
       setStatus('Error deleting mod: ' + error)
     }
+  }
+
+  /** Toast with Undo for deletes that went to Recently deleted. False when nothing did. */
+  const offerUndoDelete = (trashIds: string[], title: string): boolean => {
+    if (trashIds.length === 0) return false
+    alert.success(title, `Kept in Recently deleted for ${trashDays} day${trashDays === 1 ? '' : 's'}.`, {
+      duration: 8000,
+      action: {
+        label: 'Undo',
+        onClick: async () => {
+          const failed: string[] = []
+          for (const id of trashIds) {
+            try { await invoke('restore_recently_deleted', { id }) } catch (e) { failed.push(String(e)) }
+          }
+          if (failed.length) alert.error('Could not restore everything', failed.join('\n'))
+          await loadMods()
+          await loadFolders()
+        }
+      }
+    })
+    return true
   }
 
   const togglingModsRef = useRef<Set<string>>(new Set())
@@ -3493,6 +3547,9 @@ function App() {
     const newAllowModOverwrite = overrides.allowModOverwrite !== undefined ? overrides.allowModOverwrite : allowModOverwrite;
     const newLauncherType = overrides.launcherType !== undefined ? overrides.launcherType : launcherType;
     const newEnableAnimations = overrides.enableAnimations !== undefined ? overrides.enableAnimations : enableAnimations;
+    const newUiScale = overrides.uiScale !== undefined ? overrides.uiScale : (uiScale ?? 100);
+    const newTrashEnabled = overrides.trashEnabled !== undefined ? overrides.trashEnabled : trashEnabled;
+    const newTrashDays = overrides.trashDays !== undefined ? overrides.trashDays : trashDays;
 
     // 2. Map newAccentColor from hex to the preset name if it is a hex value
     const accentName = Object.keys(ACCENT_COLORS_MAP).find(key => ACCENT_COLORS_MAP[key] === newAccentColor) || newAccentColor;
@@ -3518,6 +3575,9 @@ function App() {
       allowModOverwrite: newAllowModOverwrite,
       launcherType: newLauncherType,
       enableAnimations: newEnableAnimations,
+      uiScale: newUiScale,
+      trashEnabled: newTrashEnabled,
+      trashDays: newTrashDays,
     };
 
     // 4. Save to backend
@@ -3557,6 +3617,9 @@ function App() {
     if (overrides.allowModOverwrite !== undefined) setAllowModOverwrite(newAllowModOverwrite);
     if (overrides.launcherType !== undefined) setLauncherType(newLauncherType);
     if (overrides.enableAnimations !== undefined) setEnableAnimations(newEnableAnimations);
+    if (overrides.uiScale !== undefined) setUiScale(newUiScale);
+    if (overrides.trashEnabled !== undefined) setTrashEnabled(newTrashEnabled);
+    if (overrides.trashDays !== undefined) setTrashDays(newTrashDays);
 
     // 6. Handle side effects (DRP connection, theme, etc.)
     if (newEnableDrp && !enableDrp) {
@@ -3635,6 +3698,9 @@ function App() {
         setEnableDrp(settings.enableDrp);
         if (settings.launcherType) setLauncherType(settings.launcherType);
         setEnableAnimations(settings.enableAnimations !== false);
+        setUiScale(settings.uiScale ?? 100);
+        setTrashEnabled(settings.trashEnabled !== false);
+        setTrashDays(settings.trashDays || 7);
 
         // 5. Run auto update check if enabled
         // Applying the settings above is idempotent, so it is safe under a
@@ -3724,7 +3790,7 @@ function App() {
 
       {panels.settings && (
         <SettingsPanel
-          settings={{ hideSuffix, autoOpenDetails, showHeroIcons, showHeroBg, showModType, showExperimental, enableDrp, parallelProcessing, autoCheckUpdates, holdToDelete, showSubfolderMods, bypassGameRunningLock, galactaMode, allowModOverwrite, launcherType, enableAnimations }}
+          settings={{ hideSuffix, autoOpenDetails, showHeroIcons, showHeroBg, showModType, showExperimental, enableDrp, parallelProcessing, autoCheckUpdates, holdToDelete, showSubfolderMods, bypassGameRunningLock, galactaMode, allowModOverwrite, launcherType, enableAnimations, uiScale: uiScale ?? 100, trashEnabled, trashDays }}
           galactaDetected={!!projectGalactaMod}
           onSave={handleSaveSettings}
           onClose={() => setPanel('settings', false)}
@@ -4153,7 +4219,8 @@ function App() {
                     )}
                   </div>
 
-                  {/* Character/Hero Chips */}
+                  {/* Character/Hero Chips (hidden while no mod has a hero) */}
+                  {availableCharacters.length > 0 && <>
                   <div
                     className="filter-section-header"
                     onClick={() => setShowCharacterFilters(v => !v)}
@@ -4188,8 +4255,10 @@ function App() {
                       })}
                     />
                   )}
+                  </>}
 
-                  {/* Category Chips */}
+                  {/* Category Chips (hidden while no mod has a type) */}
+                  {availableCategories.length > 0 && <>
                   <div
                     className="filter-section-header with-margin"
                     onClick={() => setShowTypeFilters(v => !v)}
@@ -4214,6 +4283,7 @@ function App() {
                       })}
                     </div>
                   )}
+                  </>}
                 </div>
               </div>
               {/* Vertical Resize Handle */}
@@ -4245,7 +4315,7 @@ function App() {
             </div>
 
             {/* Center Panel - Mod List */}
-            <div className="center-panel" data-tour="mod-list">
+            <div className={`center-panel ${selectedMods.size > 0 ? 'has-bulk-bar' : ''}`} data-tour="mod-list">
               <div className="center-header">
                 <div className="header-title">
                   <h2>

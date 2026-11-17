@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { formatFileSize } from '../utils/format';
 import { AnimatedThemeToggler } from './ui/AnimatedThemeToggler'
 import Switch from './ui/Switch'
 import Checkbox from './ui/Checkbox'
@@ -24,6 +25,9 @@ import './SettingsPanel.css'
 import { useAlert } from './AlertHandler'
 import { motion } from 'framer-motion'
 import { useDialog } from '../hooks/useDialog'
+import { IconButton } from '@mui/material'
+import { Clear as ClearIcon } from '@mui/icons-material'
+import { invoke } from '@tauri-apps/api/core'
 
 const ACCENT_COLORS = {
   repakRed: '#be1c1c',
@@ -59,8 +63,14 @@ type SettingsPayload = {
   galactaMode: boolean;
   allowModOverwrite: boolean;
   launcherType: 'steam' | 'epic';
+  uiScale?: number;
+  trashEnabled?: boolean;
+  trashDays?: number;
   enableAnimations: boolean;
 };
+
+/** One Recently deleted entry (trash.rs TrashEntry) */
+type TrashEntry = { id: string; name: string; deletedAt: number; size: number };
 
 type SettingsPanelProps = {
   settings: Partial<SettingsPayload>;
@@ -89,6 +99,33 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
   const dialog = useDialog(onClose, 'Settings')
   const alert = useAlert();
   const [activeCategory, setActiveCategory] = useState<CategoryId>('general');
+  // Settings search: while it has text every category shows, and the effect below
+  // hides each row and section whose words do not match (rows found by class, so a
+  // new setting is searchable without registering it anywhere)
+  const [settingsQuery, setSettingsQuery] = useState('');
+  const [noSettingsMatch, setNoSettingsMatch] = useState(false);
+  const settingsContentRef = useRef<HTMLDivElement | null>(null);
+  const showCategory = (id: CategoryId) => settingsQuery.trim() !== '' || activeCategory === id;
+  useEffect(() => {
+    const root = settingsContentRef.current;
+    if (!root) return;
+    const q = settingsQuery.trim().toLowerCase();
+    let anyVisible = false;
+    root.querySelectorAll<HTMLElement>('.setting-section').forEach(section => {
+      const heading = section.querySelector('h3')?.textContent?.toLowerCase() ?? '';
+      const headingHit = q !== '' && heading.includes(q);
+      let sectionVisible = !q || headingHit;
+      section.querySelectorAll<HTMLElement>('.setting-item').forEach(item => {
+        const hit = !q || headingHit || (item.textContent ?? '').toLowerCase().includes(q);
+        item.hidden = !hit;
+        if (hit) sectionVisible = true;
+      });
+      if (q && !sectionVisible && (section.textContent ?? '').toLowerCase().includes(q)) sectionVisible = true;
+      section.hidden = !sectionVisible;
+      if (sectionVisible) anyVisible = true;
+    });
+    setNoSettingsMatch(q !== '' && !anyVisible);
+  }, [settingsQuery, activeCategory]);
   const [hideSuffix, setHideSuffix] = useState(settings.hideSuffix || false);
   const [autoOpenDetails, setAutoOpenDetails] = useState(settings.autoOpenDetails || false);
   const [showHeroIcons, setShowHeroIcons] = useState(settings.showHeroIcons || false);
@@ -104,6 +141,25 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
   const [allowModOverwrite, setAllowModOverwrite] = useState(settings.allowModOverwrite || false);
   const [enableDrp, setEnableDrp] = useState(settings.enableDrp !== false);
   const [launcherType, setLauncherType] = useState<'steam' | 'epic'>(settings.launcherType || 'steam');
+  const [uiScale, setUiScale] = useState<number>(settings.uiScale || 0);
+  const [trashEnabled, setTrashEnabled] = useState(settings.trashEnabled !== false);
+  const [trashDays, setTrashDays] = useState<number>(settings.trashDays || 7);
+  const [trashEntries, setTrashEntries] = useState<TrashEntry[]>([]);
+  const loadTrash = () =>
+    invoke<TrashEntry[]>('list_recently_deleted').then(setTrashEntries).catch(console.warn);
+  useEffect(() => { loadTrash(); }, []);
+  const restoreTrash = async (id: string) => {
+    try {
+      await invoke('restore_recently_deleted', { id });
+    } catch (e) {
+      alert.error('Could not restore', String(e));
+    }
+    loadTrash();
+  };
+  const purgeTrash = async (id?: string) => {
+    await invoke('purge_recently_deleted', { id: id ?? null }).catch(console.warn);
+    loadTrash();
+  };
   const [enableAnimations, setEnableAnimations] = useState(settings.enableAnimations !== false);
   const [showRatMode, setShowRatMode] = useState(false);
 
@@ -133,7 +189,10 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
       galactaMode,
       allowModOverwrite,
       launcherType,
-      enableAnimations
+      enableAnimations,
+      uiScale,
+      trashEnabled,
+      trashDays
     });
     alert.success('Settings Saved', 'Your preferences have been updated.');
     onClose();
@@ -176,7 +235,7 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
     <div className="modal-overlay" onClick={onClose}>
       <motion.div
         {...dialog}
-                className="modal-content settings-modal settings-modal-split"
+        className="modal-content settings-modal settings-modal-split"
         onClick={(e) => e.stopPropagation()}
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -191,12 +250,33 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
 
         <div className="settings-layout">
           <nav className="settings-sidebar" aria-label="Settings categories">
+            <div className="settings-search-wrap">
+              <input
+                type="text"
+                className="settings-search"
+                placeholder="Search settings"
+                aria-label="Search settings"
+                value={settingsQuery}
+                onChange={e => setSettingsQuery(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Escape' && settingsQuery) { e.preventDefault(); setSettingsQuery(''); } }}
+              />
+              {settingsQuery && (
+                <IconButton
+                  size="small"
+                  className="clear-search-btn"
+                  aria-label="Clear search"
+                  onClick={() => setSettingsQuery('')}
+                >
+                  <ClearIcon fontSize="small" />
+                </IconButton>
+              )}
+            </div>
             {CATEGORIES.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 type="button"
-                className={`settings-nav-item ${activeCategory === id ? 'active' : ''}`}
-                onClick={() => setActiveCategory(id)}
+                className={`settings-nav-item ${activeCategory === id && !settingsQuery.trim() ? 'active' : ''}`}
+                onClick={() => { setActiveCategory(id); setSettingsQuery(''); }}
                 aria-current={activeCategory === id ? 'page' : undefined}
               >
                 <Icon size={16} className="settings-nav-icon" />
@@ -205,8 +285,9 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
             ))}
           </nav>
 
-          <div className="modal-body settings-content" key={activeCategory}>
-            {activeCategory === 'general' && (
+          <div className="modal-body settings-content" key={activeCategory} ref={settingsContentRef}>
+            {noSettingsMatch && <p className="setting-hint settings-no-match">No settings match "{settingsQuery.trim()}".</p>}
+            {showCategory('general') && (
               <>
                 <div className="setting-section">
                   <h3>Game Mods Path</h3>
@@ -336,10 +417,65 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
                     </Checkbox>
                   </div>
                 </div>
+
+                <div className="setting-section">
+                  <h3>Recently Deleted</h3>
+                  <div className="setting-group">
+                    <div className="setting-item">
+                      <Checkbox checked={trashEnabled} onChange={(checked: boolean) => setTrashEnabled(checked)}>
+                        <span>Keep deleted mods in Recently deleted, so a delete can be undone</span>
+                      </Checkbox>
+                    </div>
+                    {trashEnabled && (
+                      <div className="setting-item">
+                        <span className="setting-hint">Delete them after</span>
+                        <div className="segmented-control trash-days">
+                          {[1, 7, 30].map(d => (
+                            <button
+                              key={d}
+                              className={`segment-btn ${trashDays === d ? 'active' : ''}`}
+                              onClick={() => setTrashDays(d)}
+                            >
+                              {d} day{d === 1 ? '' : 's'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="setting-item trash-list">
+                      {trashEntries.length === 0 ? (
+                        <span className="setting-hint">Nothing deleted recently.</span>
+                      ) : (
+                        <div className="trash-frame">
+                          <div className="trash-rows">
+                            {trashEntries.map(t => (
+                              <div key={t.id} className="trash-row">
+                                <span className="trash-name" title={t.name}>{t.name.replace(/_\d+_P$/i, '').replace(/_P$/i, '')}</span>
+                                <span className="trash-meta">
+                                  {new Date(t.deletedAt * 1000).toLocaleDateString()} · {formatFileSize(t.size)}
+                                </span>
+                                <button className="trash-btn" onClick={() => restoreTrash(t.id)}>Restore</button>
+                                <button className="trash-btn danger" onClick={() => purgeTrash(t.id)}>Delete</button>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="trash-footer">
+                            <span className="trash-meta">
+                              {trashEntries.length} item{trashEntries.length === 1 ? '' : 's'}
+                            </span>
+                            <button className="trash-btn danger" onClick={() => purgeTrash()}>
+                              Empty archive
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </>
             )}
 
-            {activeCategory === 'interface' && (
+            {showCategory('interface') && (
               <>
                 <div className="setting-section">
                   <h3>Theme</h3>
@@ -361,6 +497,24 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
                           onClick={() => setAccentColor(color)}
                           title={name.charAt(0).toUpperCase() + name.slice(1)}
                         />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="setting-section">
+                  <h3>UI Scale</h3>
+                  <div className="setting-group">
+                    <p className="setting-hint">Size of the whole app.</p>
+                    <div className="segmented-control ui-scale">
+                      {[0, 80, 90, 100, 110, 125].map(v => (
+                        <button
+                          key={v}
+                          className={`segment-btn ${uiScale === v ? 'active' : ''}`}
+                          onClick={() => setUiScale(v)}
+                        >
+                          {v === 0 ? 'Auto' : `${v}%`}
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -502,7 +656,7 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
               </>
             )}
 
-            {activeCategory === 'integrations' && (
+            {showCategory('integrations') && (
               <div className="setting-section">
                 <h3>Integrations</h3>
                 <div className="setting-group">
@@ -525,7 +679,7 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
               </div>
             )}
 
-            {activeCategory === 'help' && (
+            {showCategory('help') && (
               <>
                 <div className="setting-section">
                   <h3>Help</h3>

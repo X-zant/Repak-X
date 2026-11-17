@@ -187,3 +187,64 @@
     font-size: 3rem;
     opacity: 0.8;
 }
+/* Duplicate cards are conflict cards with this pill in the header */
+.clash-duplicate-pill {
+  margin-left: auto;
+  font-family: var(--font-primary);
+  flex-shrink: 0;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 999px;
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning), transparent 85%);
+  border: 1px solid color-mix(in srgb, var(--warning), transparent 60%);
+}
+
+/* Delete at the end of every conflict and duplicate row (goes to Recently deleted) */
+.clash-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-secondary);
+}
+
+.clash-delete-btn:hover:not(:disabled) {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger), transparent 88%);
+  border-color: color-mix(in srgb, var(--danger), transparent 60%);
+}
+
+/* Folder prefix, shown only when two rows of a card share a file name */
+.clash-mod-folder {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+/* Hover reveal for cut-off names (useHoverTextReveal). The inner span moves with
+   `left` (transforms don't apply to inline boxes), so the resting ellipsis works. */
+.clash-mod-name-inner {
+  position: relative;
+  left: 0;
+}
+
+.clash-mod-name.is-scrolling {
+  text-overflow: clip;
+}
+
+.clash-mod-name.is-scrolling .clash-mod-name-inner {
+  animation: clash-name-reveal var(--reveal-duration, 2s) ease-in-out forwards;
+}
+
+@keyframes clash-name-reveal {
+  from { left: 0; }
+  to { left: var(--reveal-distance, 0px); }
+}

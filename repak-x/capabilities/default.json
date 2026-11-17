@@ -30,6 +30,7 @@
     "core:window:allow-set-size",
     "core:window:allow-set-resizable",
     "core:window:allow-center",
-    "core:webview:allow-create-webview-window"
+    "core:webview:allow-create-webview-window",
+    "core:webview:allow-set-webview-zoom"
   ]
 }

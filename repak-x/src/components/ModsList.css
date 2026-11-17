@@ -392,8 +392,11 @@
 :root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(10) { animation-delay: 270ms; }
 :root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(11) { animation-delay: 300ms; }
 :root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(12) { animation-delay: 330ms; }
+/* Every card from 13 on enters together. No cutoff: the old `n+25 { animation: none }`
+   showed cards 25+ instantly while 13-24 were still hidden in their delay, leaving a
+   hole wherever more than 24 cards fit on screen (compact grid). Off-screen cards
+   skip paint (content-visibility), so animating them costs nothing visible. */
 :root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(n+13) { animation-delay: 360ms; }
-:root:not([data-animations="off"]) .mod-list-grid .mod-card:nth-child(n+25) { animation: none; }
 
 /* Exit: played before delete (duration matches requestDelete in ModsList.tsx) */
 @keyframes mod-card-leave {

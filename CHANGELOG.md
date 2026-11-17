@@ -1,10 +1,17 @@
 # Repak X — Changelog
 
-## [2.3.0](https://github.com/X-zant/Repak-X/releases/latest)
+## [2.4.0](https://github.com/X-zant/Repak-X/releases/latest)
 
 ### 🔧 Backend / Logic
-- Added a Deobfuscate feature to quickly strip encryption from all installed mods. (Accessible from the Tools panel, and in the Mods Details panel as a single mod operation)
+- Added Galacta Mode: only the mods the game has loaded stay locked while it runs. (Requires Project Galacta v1.6.0, can be turned off in Settings)
+- Deleted mods now go to Recently deleted and can be restored for a set number of days. (Can be turned off in Settings)
+- Check Conflicts now detects mod duplicates.
+- Mod operations bug fixes.
 
-### ✨ VFX Updater
-- Fixed a conversion issue making Step 2 take a long time.
-- A successful conversion now automatically disables the outdated source mod.
+### 🎨 Frontend / UI
+- Added a UI Scale setting.
+- Added a search bar to Settings.
+- The batch controls bar now floats at the bottom of the mods list.
+- Modals and the right-click menu are now fully usable with the keyboard.
+- Improved Light Mode readability.
+- Performance optimizations.

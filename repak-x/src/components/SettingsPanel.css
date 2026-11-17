@@ -628,3 +628,157 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
+/* Settings search (SettingsPanel settingsQuery) */
+.settings-search {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--panel-border);
+  background: var(--bg-darkest);
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+}
+
+.settings-search:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+/* Rows the search hides: [hidden] alone loses to the rows' own display rules */
+.settings-content [hidden] {
+  display: none !important;
+}
+
+.settings-no-match {
+  padding: 1rem 0;
+}
+
+/* Recently deleted list (Settings > General) */
+.trash-list {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.trash-frame {
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--field-bg);
+  overflow: hidden;
+}
+
+.trash-rows {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.trash-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.trash-row:hover {
+  background: var(--tag-bg);
+}
+
+.trash-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+}
+
+.trash-meta {
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+.trash-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 6px 12px;
+}
+
+/* Small text buttons: the global button rule's 36px height and fill are too heavy in a list */
+.trash-btn {
+  /* Fixed height, centered, line-height 1: with the inherited line box the label
+     sat low (Segoe UI's ascent at a small size) */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  min-height: 0;
+  line-height: 1;
+  font-family: inherit;
+  padding: 0 10px;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+}
+
+.trash-btn:hover:not(:disabled) {
+  background: var(--tag-hover-bg);
+  border-color: var(--text-secondary);
+}
+
+.trash-btn.danger {
+  color: var(--danger);
+}
+
+.trash-btn.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger), transparent 88%);
+  border-color: color-mix(in srgb, var(--danger), transparent 50%);
+}
+
+/* Recently deleted retention: a wide, low switch under its label */
+.segmented-control.trash-days {
+  width: 100%;
+  max-width: 300px;
+}
+
+.segmented-control.trash-days .segment-btn {
+  padding: 6px 12px;
+  min-height: 0;
+  font-size: var(--fs-sm);
+}
+
+/* Clear button inside the search field, same look as the mods search */
+.settings-search-wrap {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.settings-search-wrap .settings-search {
+  margin-bottom: 0;
+  padding-right: 32px;
+}
+
+.settings-search-wrap .clear-search-btn {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-height: 0;
+  padding: 3px;
+}
+
+/* UI scale: six options, so tighter buttons and room for all of them */
+.segmented-control.ui-scale {
+  width: 100%;
+  max-width: 460px;
+}
+
+.segmented-control.ui-scale .segment-btn {
+  padding: 6px 10px;
+  min-height: 0;
+  font-size: var(--fs-sm);
+}

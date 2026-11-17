@@ -218,3 +218,22 @@ button:disabled {
   opacity: 1 !important;
   cursor: not-allowed !important;
 }
+
+/* Window in the background (App.tsx sets data-app-bg): pause decorative loops so
+   the app costs nothing while the game runs. Spinners and progress bars are left
+   out on purpose: a frozen one reads as a hung app. */
+:root[data-app-bg] .mod-card-hero-bg,
+:root[data-app-bg] .mod-card-hero-bg::before,
+:root[data-app-bg] .mod-card-hero-bg::after,
+:root[data-app-bg] .aurora-text,
+:root[data-app-bg] .border-beam::after,
+:root[data-app-bg] .border-beam-light,
+:root[data-app-bg] .shine-border::before,
+:root[data-app-bg] .shine-border::after,
+:root[data-app-bg] .dropzone-card,
+:root[data-app-bg] .dropzone-card .zone-icon,
+:root[data-app-bg] .credits-heart,
+:root[data-app-bg] .log-drawer-cursor,
+:root[data-app-bg] .typing-cursor::after {
+  animation-play-state: paused !important;
+}
