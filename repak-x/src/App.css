@@ -1952,8 +1952,11 @@ input[type="text"]:focus {
   flex-shrink: 0;
 }
 
+/* Hidden but kept in the layout so closing can animate (see the floating bar rules) */
 .bulk-actions-toolbar.inactive {
-  display: none;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* Only the label text is kept from wrapping -- deliberately NOT on the toolbar
@@ -2598,13 +2601,23 @@ input[type="text"]:focus {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
-:root:not([data-animations="off"]) .bulk-actions-toolbar:not(.inactive) {
-  animation: bulkbar-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+/* Open and close both animate: a transition instead of an entry keyframe, since
+   display:none used to drop the bar before anything could play on close.
+   visibility switches at the end of the fade-out and at the start of the fade-in. */
+.bulk-actions-toolbar.inactive {
+  transform: translate(-50%, 12px);
 }
 
-@keyframes bulkbar-in {
-  from { opacity: 0; transform: translate(-50%, 12px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+:root:not([data-animations="off"]) .bulk-actions-toolbar {
+  transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s linear 0s;
+}
+
+:root:not([data-animations="off"]) .bulk-actions-toolbar.inactive {
+  transition: opacity 0.15s ease-in,
+    transform 0.15s ease-in,
+    visibility 0s linear 0.15s;
 }
 
 .center-panel.has-bulk-bar .mod-list-grid {

@@ -374,6 +374,10 @@ function App() {
   const [filtersHeight, setFiltersHeight] = useState<number | null>(null)
   const [isFiltersResizing, setIsFiltersResizing] = useState(false)
   const [selectedMods, setSelectedMods] = useState<Set<string>>(new Set())
+  // The floating batch bar fades out after the selection clears; it keeps showing
+  // the last count meanwhile instead of flashing "0 selected"
+  const lastSelectionCountRef = useRef(0)
+  if (selectedMods.size > 0) lastSelectionCountRef.current = selectedMods.size
   const [showBulkActions, setShowBulkActions] = useState(false)
   const [newTagInput, setNewTagInput] = useState('')
   const [allTags, setAllTags] = useState<string[]>([])
@@ -3067,13 +3071,19 @@ function App() {
   // Galacta's key names are Unreal's (PageUp, Semicolon); show them the way a keyboard does
   const KEY_LABELS: Record<string, string> = { PageUp: 'Page Up', PageDown: 'Page Down', Semicolon: ';' }
   const toggleKeyText = `the Mod Toggle Key (${KEY_LABELS[galactaToggleKey] ?? galactaToggleKey})`
+  // Before Galacta's login pass the game has natively mounted every enabled (.pak) mod
+  // and nothing else, so lock exactly those until the state file arrives.
+  const galactaWaiting = !!(gameRunning && galactaMode && !bypassGameRunningLock && projectGalactaMod && galactaState.status === 'noInfo')
+  const isEnabledPath = (modPath: string) => /\.pak$/i.test(modPath)
   const galactaMountedKeys = new Set(galactaLive?.mounted ? galactaLive.keys : [])
   const isModMounted = (modPath: string) => galactaMountedKeys.has(galactaModKey(modPath) ?? '')
   const isModLocked = (modPath: string) => {
     if (!gameRunning || bypassGameRunningLock) return false
-    if (!galactaLive) return true
     // Galacta itself is never unmounted by the Mod Toggle Key
-    return modPath === projectGalactaMod?.path || isModMounted(modPath)
+    if (modPath === projectGalactaMod?.path) return true
+    if (galactaWaiting) return isEnabledPath(modPath)
+    if (!galactaLive) return true
+    return isModMounted(modPath)
   }
   // Suffix for the "Game Running" launch button while Galacta Mode is in effect
   const galactaStatus = (gameRunning && galactaMode && !bypassGameRunningLock && projectGalactaMod)
@@ -3081,11 +3091,12 @@ function App() {
       ? galactaLive.mounted
         ? { label: `${galactaLive.keys.length} loaded`, title: 'Only mods the game has loaded are locked' }
         : { label: 'mods unloaded', title: `Mods were unloaded with ${toggleKeyText}: everything can be changed` }
-      : { label: 'waiting for login', title: 'No mod list from this game session yet, so everything stays locked' }
+      : { label: 'waiting for login', title: 'No mod list from Project Galacta yet: enabled mods stay locked, disabled ones can be changed' }
     : null
 
   // Badges only make sense while Galacta has mods loaded (after toggling mods off nothing is)
   const galactaLoadState = (modPath: string, enabled?: boolean): GalactaLoadState => {
+    if (galactaWaiting) return enabled ? 'loaded' : null
     if (!gameRunning || !galactaLive?.mounted) return null
     if (isModMounted(modPath)) return 'loaded'
     return enabled ? 'notLoaded' : null
@@ -3104,9 +3115,11 @@ function App() {
     }
     return { free, locked }
   }
-  const lockMessage = (action: string) => galactaLive
-    ? `Cannot ${action} a mod the game has loaded. Press ${toggleKeyText} in game to unload mods first.`
-    : `Cannot ${action} mods while game is running.`
+  const lockMessage = (action: string) => galactaWaiting
+    ? `Cannot ${action} an enabled mod before Project Galacta loads mods at login. Disabled mods can be changed.`
+    : galactaLive
+      ? `Cannot ${action} a mod the game has loaded. Press ${toggleKeyText} in game to unload mods first.`
+      : `Cannot ${action} mods while game is running.`
   const warnSkippedLocked = (locked: string[]) => {
     if (locked.length === 0) return
     alert.warning(
@@ -4394,7 +4407,7 @@ function App() {
               {/* Bulk Actions Toolbar */}
               <div className={`bulk-actions-toolbar ${selectedMods.size === 0 ? 'inactive' : ''}`}>
                 <div className="selection-info">
-                  <span className="bulk-count"><span className="bulk-count-value">{selectedMods.size}</span></span>
+                  <span className="bulk-count"><span className="bulk-count-value">{selectedMods.size || lastSelectionCountRef.current}</span></span>
                   <span className="bulk-count-label">selected</span>
                   <button onClick={() => {
                     const allPaths = filteredMods.map(m => m.path)
