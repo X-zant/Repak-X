@@ -514,9 +514,33 @@ async fn auto_detect_game_path(
     window: Window,
 ) -> Result<String, String> {
     match find_marvel_rivals() {
-        Some(game_root) => {
-            // game_path should be the ~mods directory (matching egui behavior)
-            let mods_path = game_root.join("~mods");
+        Some((game_root, launcher)) => {
+            // game_path is a direct subfolder of Paks (launch code walks up from it):
+            // existing ~mods, else the only subfolder, else create ~mods when there are none.
+            let mut mods_path = game_root.join("~mods");
+            if !mods_path.exists() {
+                let subdirs: Vec<PathBuf> = std::fs::read_dir(&game_root)
+                    .map(|rd| {
+                        rd.flatten()
+                            .map(|e| e.path())
+                            .filter(|p| p.is_dir())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                match subdirs.len() {
+                    0 => {}
+                    1 => mods_path = subdirs[0].clone(),
+                    _ => {
+                        let error_msg = format!(
+                            "Found several folders in {} - choose your mods folder manually in Settings",
+                            game_root.display()
+                        );
+                        ui_log::error("GamePath", &error_msg);
+                        toast_events::emit_game_path_failed(&window, &error_msg);
+                        return Err(error_msg);
+                    }
+                }
+            }
 
             // Create ~mods directory if it doesn't exist
             if !mods_path.exists() {
@@ -534,6 +558,10 @@ async fn auto_detect_game_path(
 
             let mut state = state.lock().unwrap();
             state.game_path = mods_path.clone();
+            if let Some(launcher) = launcher {
+                state.launcher_type = launcher.to_string();
+                ui_log::info("GamePath", format!("Launcher set to {}", launcher));
+            }
             save_state(&state).map_err(|e| e.to_string())?;
             ui_log::success(
                 "GamePath",
@@ -5634,11 +5662,16 @@ async fn launch_game(state: State<'_, Arc<Mutex<AppState>>>) -> Result<(), Strin
                 .creation_flags(CREATE_NO_WINDOW)
                 .spawn()
         } else {
+            let url = if launcher_type == "loadingbay" {
+                "loadingbay://mygame/?gameId=31"
+            } else {
+                "steam://run/2767030"
+            };
             Command::new("cmd")
                 .arg("/C")
                 .arg("start")
                 .arg("")
-                .arg("steam://run/2767030")
+                .arg(url)
                 .creation_flags(CREATE_NO_WINDOW)
                 .spawn()
         }
@@ -5653,14 +5686,19 @@ async fn launch_game(state: State<'_, Arc<Mutex<AppState>>>) -> Result<(), Strin
                 .current_dir(&game_root)
                 .spawn()
         } else {
-            Command::new("xdg-open").arg("steam://run/2767030").spawn()
+            let url = if launcher_type == "loadingbay" {
+                "loadingbay://mygame/?gameId=31"
+            } else {
+                "steam://run/2767030"
+            };
+            Command::new("xdg-open").arg(url).spawn()
         }
     };
 
     // Check launch result
     match launch_result {
         Ok(_) => {
-            info!("Successfully launched Marvel Rivals via Steam");
+            info!("Successfully launched Marvel Rivals via {}", launcher_type);
 
             // Spawn a background task to restore the launch_record after the game starts
             let launch_record_path_clone = launch_record_path.clone();

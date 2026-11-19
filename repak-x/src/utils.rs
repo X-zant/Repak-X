@@ -442,20 +442,62 @@ pub fn get_current_pak_characteristics(mod_contents: Vec<String>) -> String {
     chars.mod_type
 }
 
-pub fn find_marvel_rivals() -> Option<PathBuf> {
-    let shit = get_steam_library_paths();
-    if shit.is_empty() {
-        return None;
-    }
+/// Finds the game's Paks folder. The launcher ("steam" / "epic" / "loadingbay") is
+/// returned only when the game was found under exactly one launcher.
+pub fn find_marvel_rivals() -> Option<(PathBuf, Option<&'static str>)> {
+    let mut found: Vec<(PathBuf, &'static str)> = Vec::new();
 
-    for lib in shit {
+    for lib in get_steam_library_paths() {
         let path = lib.join("steamapps/common/MarvelRivals/MarvelGame/Marvel/Content/Paks");
         if path.exists() {
-            return Some(path);
+            found.push((path, "steam"));
+            break;
         }
     }
-    println!("Marvel Rivals not found.");
-    None
+
+    // Epic: each installed game has a JSON .item manifest with its InstallLocation
+    #[cfg(target_os = "windows")]
+    if let Ok(entries) =
+        std::fs::read_dir(r"C:\ProgramData\Epic\EpicGamesLauncher\Data\Manifests")
+    {
+        for entry in entries.flatten() {
+            let Ok(text) = std::fs::read_to_string(entry.path()) else {
+                continue;
+            };
+            let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else {
+                continue;
+            };
+            if let Some(loc) = json["InstallLocation"].as_str() {
+                let path = PathBuf::from(loc).join("MarvelGame/Marvel/Content/Paks");
+                if path.exists() {
+                    found.push((path, "epic"));
+                    break;
+                }
+            }
+        }
+    }
+
+    // shortcut: assumes Loading Bay's default "<drive>:\Loading Bay Games" library; read its config if users pick custom folders
+    #[cfg(target_os = "windows")]
+    for drive in b'C'..=b'Z' {
+        let path = PathBuf::from(format!(
+            "{}:/Loading Bay Games/Marvel Rivals/MarvelGame/Marvel/Content/Paks",
+            drive as char
+        ));
+        if path.exists() {
+            found.push((path, "loadingbay"));
+            break;
+        }
+    }
+
+    let launcher = (found.len() == 1).then(|| found[0].1);
+    match found.into_iter().next() {
+        Some((path, _)) => Some((path, launcher)),
+        None => {
+            println!("Marvel Rivals not found.");
+            None
+        }
+    }
 }
 
 /// Steam installation roots on Linux: native package, Flatpak and Snap.
@@ -556,12 +598,15 @@ pub fn get_steam_library_paths() -> Vec<PathBuf> {
 /// Get Steam installation path from Windows registry
 #[cfg(target_os = "windows")]
 fn get_steam_path_from_registry() -> Option<PathBuf> {
+    use std::os::windows::process::CommandExt;
     use std::process::Command;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
 
     // Query registry for Steam install path
     // reg query "HKCU\Software\Valve\Steam" /v SteamPath
     let output = Command::new("reg")
         .args(["query", r"HKCU\Software\Valve\Steam", "/v", "SteamPath"])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .ok()?;
 

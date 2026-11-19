@@ -25,9 +25,17 @@ import './SettingsPanel.css'
 import { useAlert } from './AlertHandler'
 import { motion } from 'framer-motion'
 import { useDialog } from '../hooks/useDialog'
+import { useStableCallback } from '../hooks/useStableCallback'
 import { IconButton } from '@mui/material'
 import { Clear as ClearIcon } from '@mui/icons-material'
 import { invoke } from '@tauri-apps/api/core'
+
+// Loading Bay logomark (from store.loadingbay.com), recolored to currentColor like the react-icons
+const LoadingBayIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 36 36" fill="currentColor" aria-hidden="true">
+    <path d="M15.8934 -0.0128784H1.14288V9.56539L10.5182 17.9885V8.41028L21.1772 17.9885L10.5182 27.564V17.9885L1.14288 26.4088V35.9871H15.8934L35.9277 17.9885L15.8934 -0.0128784Z" />
+  </svg>
+);
 
 const ACCENT_COLORS = {
   repakRed: '#be1c1c',
@@ -62,7 +70,7 @@ type SettingsPayload = {
   bypassGameRunningLock: boolean;
   galactaMode: boolean;
   allowModOverwrite: boolean;
-  launcherType: 'steam' | 'epic';
+  launcherType: 'steam' | 'epic' | 'loadingbay';
   uiScale?: number;
   trashEnabled?: boolean;
   trashDays?: number;
@@ -140,7 +148,7 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
   const [galactaMode, setGalactaMode] = useState(settings.galactaMode !== false);
   const [allowModOverwrite, setAllowModOverwrite] = useState(settings.allowModOverwrite || false);
   const [enableDrp, setEnableDrp] = useState(settings.enableDrp !== false);
-  const [launcherType, setLauncherType] = useState<'steam' | 'epic'>(settings.launcherType || 'steam');
+  const [launcherType, setLauncherType] = useState<'steam' | 'epic' | 'loadingbay'>(settings.launcherType || 'steam');
   const [uiScale, setUiScale] = useState<number>(settings.uiScale || 0);
   const [trashEnabled, setTrashEnabled] = useState(settings.trashEnabled !== false);
   const [trashDays, setTrashDays] = useState<number>(settings.trashDays || 7);
@@ -172,31 +180,39 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
     setTheme(newTheme);
   };
 
-  const handleSave = () => {
-    onSave({
-      hideSuffix,
-      autoOpenDetails,
-      showHeroIcons,
-      showHeroBg,
-      showModType,
-      showExperimental,
-      autoCheckUpdates,
-      parallelProcessing,
-      enableDrp,
-      holdToDelete,
-      showSubfolderMods,
-      bypassGameRunningLock,
-      galactaMode,
-      allowModOverwrite,
-      launcherType,
-      enableAnimations,
-      uiScale,
-      trashEnabled,
-      trashDays
-    });
-    alert.success('Settings Saved', 'Your preferences have been updated.');
-    onClose();
+  // Auto-save: debounce bursts (sliders, quick toggles); flush a pending save if the panel closes first
+  const payload: SettingsPayload = {
+    hideSuffix,
+    autoOpenDetails,
+    showHeroIcons,
+    showHeroBg,
+    showModType,
+    showExperimental,
+    autoCheckUpdates,
+    parallelProcessing,
+    enableDrp,
+    holdToDelete,
+    showSubfolderMods,
+    bypassGameRunningLock,
+    galactaMode,
+    allowModOverwrite,
+    launcherType,
+    enableAnimations,
+    uiScale,
+    trashEnabled,
+    trashDays
   };
+  const save = useStableCallback(onSave);
+  const pendingSave = useRef<SettingsPayload | null>(null);
+  const isFirstRender = useRef(true);
+  const payloadKey = JSON.stringify(payload);
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    pendingSave.current = payload;
+    const t = setTimeout(() => { pendingSave.current = null; save(payload); }, 300);
+    return () => clearTimeout(t);
+  }, [payloadKey]);
+  useEffect(() => () => { if (pendingSave.current) save(pendingSave.current); }, []);
 
   // Sync local state with props when opening/changing
   useEffect(() => {
@@ -326,7 +342,7 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
                   <div className="setting-group">
                     <p className="setting-hint">Select which launcher to use when clicking "Launch Game".</p>
 
-                    <div className="segmented-control" style={{ maxWidth: '400px' }}>
+                    <div className="segmented-control" style={{ maxWidth: '560px' }}>
                       <button
                         className={`segment-btn ${launcherType === 'steam' ? 'active' : ''}`}
                         onClick={() => setLauncherType('steam')}
@@ -340,6 +356,13 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
                         title="Launch via Epic Games executable"
                       >
                         <SiEpicgames size={16} /> Epic Games
+                      </button>
+                      <button
+                        className={`segment-btn ${launcherType === 'loadingbay' ? 'active' : ''}`}
+                        onClick={() => setLauncherType('loadingbay')}
+                        title="Launch via Loading Bay protocol"
+                      >
+                        <LoadingBayIcon size={16} /> Loading Bay
                       </button>
                     </div>
                   </div>
@@ -736,14 +759,7 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
             className="btn-secondary"
             style={{ padding: '0.4rem 1rem', fontSize: 'var(--fs-base)', minWidth: 'auto' }}
           >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            className="btn-primary"
-            style={{ padding: '0.4rem 1rem', fontSize: 'var(--fs-base)', minWidth: 'auto' }}
-          >
-            Save
+            Close
           </button>
         </div>
       </motion.div>

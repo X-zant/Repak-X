@@ -245,7 +245,7 @@ type AppSettings = {
   bypassGameRunningLock: boolean
   galactaMode: boolean
   allowModOverwrite: boolean
-  launcherType: 'steam' | 'epic'
+  launcherType: 'steam' | 'epic' | 'loadingbay'
   enableAnimations: boolean
   uiScale: number
   trashEnabled: boolean
@@ -287,7 +287,7 @@ function App() {
   const [galactaState, setGalactaState] = useState<GalactaModState>({ status: 'notRunning' });
   const [galactaToggleKey, setGalactaToggleKey] = useState('F7');
   const [allowModOverwrite, setAllowModOverwrite] = useState(false);
-  const [launcherType, setLauncherType] = useState<'steam' | 'epic'>('steam');
+  const [launcherType, setLauncherType] = useState<'steam' | 'epic' | 'loadingbay'>('steam');
   const [enableAnimations, setEnableAnimations] = useState(true);
   // Whole-app zoom in percent; 0 = picked from the screen (autoUiScale)
   // null until settings load, so an existing user never sees the Auto size flash first
@@ -2108,6 +2108,9 @@ function App() {
       const path = await invoke('auto_detect_game_path') as any
       setGamePath(path)
       setStatus('Game path detected: ' + path)
+      // auto-detect may also have set the launcher in the backend
+      const settings = await invoke('get_app_settings') as any
+      if (settings.launcherType) setLauncherType(settings.launcherType)
       await loadMods()
       await loadFolders()
     } catch (error) {
