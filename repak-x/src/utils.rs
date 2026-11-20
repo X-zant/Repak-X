@@ -442,16 +442,16 @@ pub fn get_current_pak_characteristics(mod_contents: Vec<String>) -> String {
     chars.mod_type
 }
 
-/// Finds the game's Paks folder. The launcher ("steam" / "epic" / "loadingbay") is
-/// returned only when the game was found under exactly one launcher.
-pub fn find_marvel_rivals() -> Option<(PathBuf, Option<&'static str>)> {
+/// Finds every installed copy of the game's Paks folder, each with its launcher
+/// ("steam" / "epic" / "loadingbay").
+pub fn find_marvel_rivals() -> Vec<(PathBuf, &'static str)> {
     let mut found: Vec<(PathBuf, &'static str)> = Vec::new();
 
     for lib in get_steam_library_paths() {
         let path = lib.join("steamapps/common/MarvelRivals/MarvelGame/Marvel/Content/Paks");
-        if path.exists() {
+        // Steam can list the same library twice (e.g. via symlinked roots)
+        if path.exists() && !found.iter().any(|(p, _)| p == &path) {
             found.push((path, "steam"));
-            break;
         }
     }
 
@@ -471,7 +471,6 @@ pub fn find_marvel_rivals() -> Option<(PathBuf, Option<&'static str>)> {
                 let path = PathBuf::from(loc).join("MarvelGame/Marvel/Content/Paks");
                 if path.exists() {
                     found.push((path, "epic"));
-                    break;
                 }
             }
         }
@@ -486,17 +485,76 @@ pub fn find_marvel_rivals() -> Option<(PathBuf, Option<&'static str>)> {
         ));
         if path.exists() {
             found.push((path, "loadingbay"));
-            break;
         }
     }
 
-    let launcher = (found.len() == 1).then(|| found[0].1);
-    match found.into_iter().next() {
-        Some((path, _)) => Some((path, launcher)),
-        None => {
-            println!("Marvel Rivals not found.");
-            None
-        }
+    found
+}
+
+/// Which of several installs the user most likely plays, with the reason, or None
+/// when the evidence doesn't single one out (better no hint than a wrong one).
+pub fn recommend_install(installs: &[PathBuf]) -> Option<(usize, &'static str)> {
+    let signals: Vec<(bool, Option<std::time::SystemTime>)> = installs
+        .iter()
+        .map(|paks| {
+            let entries: Vec<_> = fs::read_dir(paks)
+                .map(|rd| rd.flatten().collect())
+                .unwrap_or_default();
+            // shortcut: assumes the game ships no subfolders in Paks, so any non-empty subfolder is a mods folder
+            let has_mods = entries.iter().any(|e| {
+                e.path().is_dir()
+                    && fs::read_dir(e.path()).is_ok_and(|mut rd| rd.next().is_some())
+            });
+            let newest_pak = entries
+                .iter()
+                .filter(|e| e.path().extension().is_some_and(|x| x == "pak"))
+                .filter_map(|e| e.metadata().and_then(|m| m.modified()).ok())
+                .max();
+            (has_mods, newest_pak)
+        })
+        .collect();
+    pick_recommended(&signals)
+}
+
+/// 1. the only install with mods; 2. among the tied, the only one whose game paks are
+/// over a day newer than the rest (it got the latest patch, the others went stale).
+fn pick_recommended(signals: &[(bool, Option<std::time::SystemTime>)]) -> Option<(usize, &'static str)> {
+    let with_mods: Vec<usize> = (0..signals.len()).filter(|&i| signals[i].0).collect();
+    if with_mods.len() == 1 {
+        return Some((with_mods[0], "has your mods"));
+    }
+    let pool: Vec<usize> = if with_mods.is_empty() { (0..signals.len()).collect() } else { with_mods };
+    let best = *pool.iter().max_by_key(|&&i| signals[i].1)?;
+    let best_time = signals[best].1?;
+    let day = std::time::Duration::from_secs(86_400);
+    let clear_winner = pool.iter().filter(|&&i| i != best).all(|&i| match signals[i].1 {
+        Some(t) => best_time.duration_since(t).is_ok_and(|d| d > day),
+        None => true,
+    });
+    clear_winner.then_some((best, "most recently updated"))
+}
+
+#[cfg(test)]
+mod recommend_tests {
+    use super::pick_recommended;
+    use std::time::{Duration, SystemTime};
+
+    #[test]
+    fn picks_by_mods_then_clear_update_gap() {
+        let now = SystemTime::now();
+        let old = now - Duration::from_secs(3 * 86_400);
+        let recent = now - Duration::from_secs(3_600);
+        // only install with mods wins even if older
+        assert_eq!(pick_recommended(&[(false, Some(now)), (true, Some(old))]), Some((1, "has your mods")));
+        // no mods: clearly newer paks win; empty/fake install loses
+        assert_eq!(pick_recommended(&[(false, Some(old)), (false, Some(now))]), Some((1, "most recently updated")));
+        assert_eq!(pick_recommended(&[(false, None), (false, Some(old))]), Some((1, "most recently updated")));
+        // both patched the same day: no confident pick
+        assert_eq!(pick_recommended(&[(false, Some(recent)), (false, Some(now))]), None);
+        // both have mods and same patch: no pick
+        assert_eq!(pick_recommended(&[(true, Some(now)), (true, Some(recent))]), None);
+        // nothing to go on
+        assert_eq!(pick_recommended(&[(false, None), (false, None)]), None);
     }
 }
 

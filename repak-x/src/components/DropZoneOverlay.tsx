@@ -29,6 +29,7 @@ type DropZoneOverlayProps = {
     onClose: () => void;
     onCreateFolder?: (name: string) => Promise<string | null>;
     onNewFolderDrop?: () => void;
+    currentFolderId?: string | null;
 };
 
 // Simplified folder tree for the overlay
@@ -130,7 +131,8 @@ const DropZoneOverlay = ({
     onQuickOrganizeDrop,
     onClose,
     onCreateFolder,
-    onNewFolderDrop
+    onNewFolderDrop,
+    currentFolderId
 }: DropZoneOverlayProps) => {
     const [hoveredZone, setHoveredZone] = useState<'install' | 'organize' | 'new-folder' | null>(null); // 'install' | 'organize' | 'new-folder'
     const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -289,6 +291,8 @@ const DropZoneOverlay = ({
     }, [isVisible, isAprilFools]);
 
     const rootFolder = useMemo(() => folders.find((f: FolderRecord) => f.is_root), [folders]);
+    // 'all' and stale ids don't match a real folder, so they fall through to root
+    const viewedFolder = useMemo(() => folders.find((f: FolderRecord) => f.id === currentFolderId), [folders, currentFolderId]);
     const subfolders = useMemo(() => folders.filter(f => !f.is_root), [folders]);
     const treeData = useMemo(() => {
         const root = buildTree(subfolders);
@@ -389,12 +393,12 @@ const DropZoneOverlay = ({
 
             // Check if over organize zone (but not specific folder) - this is
             // the card's own title/description/padding, not empty space
-            // outside it, so it should still quick-organize, just to the root
-            // folder rather than whichever one happened to be selected last.
+            // outside it, so it should still quick-organize: to the folder
+            // currently viewed in the mods list, else the root folder.
             const organizeZone = element.closest('[data-dropzone="organize"]');
             if (organizeZone) {
                 setHoveredZone('organize');
-                const fallbackFolderId = selectedFolderId ?? rootFolder?.id ?? null;
+                const fallbackFolderId = selectedFolderId ?? viewedFolder?.id ?? rootFolder?.id ?? null;
                 setSelectedFolderId(fallbackFolderId);
                 if (fallbackFolderId) {
                     onQuickOrganizeDrop?.(fallbackFolderId);
@@ -414,7 +418,7 @@ const DropZoneOverlay = ({
             unlistenDragOver.then(f => f());
             stopScrolling();
         };
-    }, [isVisible, selectedFolderId, rootFolder, onInstallDrop, onQuickOrganizeDrop, onNewFolderDrop]);
+    }, [isVisible, selectedFolderId, viewedFolder, rootFolder, onInstallDrop, onQuickOrganizeDrop, onNewFolderDrop]);
 
     const handleNewFolder = async (e: React.MouseEvent) => {
         e.stopPropagation();

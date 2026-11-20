@@ -306,10 +306,10 @@ export default function ModDetailsPanel({ mod, initialDetails, onClose, characte
                         borderBottomRightRadius: '4px',
                         fontWeight: 600,
                         fontSize: 'var(--fs-sm)',
-                        background: 'color-mix(in srgb, var(--accent-primary), transparent 85%)',
-                        color: 'var(--accent-primary)',
-                        border: '1px solid color-mix(in srgb, var(--accent-primary), transparent 65%)',
-                        borderLeft: details.is_iostore || details.is_hybrid ? 'none' : '1px solid color-mix(in srgb, var(--accent-primary), transparent 65%)'
+                        background: 'color-mix(in srgb, #3b82f6, transparent 85%)',
+                        color: '#60a5fa',
+                        border: '1px solid color-mix(in srgb, #3b82f6, transparent 65%)',
+                        borderLeft: details.is_iostore || details.is_hybrid ? 'none' : '1px solid color-mix(in srgb, #3b82f6, transparent 65%)'
                       }} title="This mod package is encrypted">Encrypted</div>
                     )}
                   </div>

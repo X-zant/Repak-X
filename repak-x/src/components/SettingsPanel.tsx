@@ -31,7 +31,7 @@ import { Clear as ClearIcon } from '@mui/icons-material'
 import { invoke } from '@tauri-apps/api/core'
 
 // Loading Bay logomark (from store.loadingbay.com), recolored to currentColor like the react-icons
-const LoadingBayIcon = ({ size = 16 }: { size?: number }) => (
+export const LoadingBayIcon = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 36 36" fill="currentColor" aria-hidden="true">
     <path d="M15.8934 -0.0128784H1.14288V9.56539L10.5182 17.9885V8.41028L21.1772 17.9885L10.5182 27.564V17.9885L1.14288 26.4088V35.9871H15.8934L35.9277 17.9885L15.8934 -0.0128784Z" />
   </svg>

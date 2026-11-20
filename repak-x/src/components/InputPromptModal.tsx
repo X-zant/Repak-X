@@ -15,8 +15,10 @@ type InputPromptModalProps = {
     onCancel: () => void;
     initialValue?: string;
     accentColor?: string;
-    mode?: 'input' | 'confirm';
+    mode?: 'input' | 'confirm' | 'choice';
     description?: string;
+    /** 'choice' mode: one button per option, clicking it confirms with its value */
+    options?: { value: string; label: React.ReactNode; detail?: string }[];
 };
 
 /**
@@ -46,7 +48,8 @@ const InputPromptModal = ({
     initialValue = '',
     accentColor = '',
     mode = 'input',
-    description = ''
+    description = '',
+    options = []
 }: InputPromptModalProps) => {
     const dialog = useDialog(onCancel, title)
     const [value, setValue] = useState(initialValue);
@@ -121,7 +124,17 @@ const InputPromptModal = ({
 
                         {/* Content */}
                         <form onSubmit={handleSubmit} className="prompt-content">
-                            {mode === 'confirm' ? (
+                            {mode === 'choice' ? (
+                                <>
+                                    {description && <p className="prompt-description">{description}</p>}
+                                    {options.map(o => (
+                                        <button key={o.value} type="button" className="prompt-option" onClick={() => onConfirm(o.value)}>
+                                            <span className="prompt-option-label">{o.label}</span>
+                                            {o.detail && <span className="prompt-option-detail">{o.detail}</span>}
+                                        </button>
+                                    ))}
+                                </>
+                            ) : mode === 'confirm' ? (
                                 <p className="prompt-description">{description}</p>
                             ) : (
                                 <input
@@ -144,14 +157,16 @@ const InputPromptModal = ({
                                 >
                                     {cancelText}
                                 </button>
-                                <button
-                                    type="submit"
-                                    className="prompt-btn prompt-btn-confirm"
-                                    disabled={mode === 'input' && !value.trim()}
-                                    title={mode === 'input' && !value.trim() ? 'Type a name first' : undefined}
-                                >
-                                    {confirmText}
-                                </button>
+                                {mode !== 'choice' && (
+                                    <button
+                                        type="submit"
+                                        className="prompt-btn prompt-btn-confirm"
+                                        disabled={mode === 'input' && !value.trim()}
+                                        title={mode === 'input' && !value.trim() ? 'Type a name first' : undefined}
+                                    >
+                                        {confirmText}
+                                    </button>
+                                )}
                             </div>
                         </form>
                     </motion.div>

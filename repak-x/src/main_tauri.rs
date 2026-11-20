@@ -508,12 +508,42 @@ async fn set_game_path(path: String, state: State<'_, Arc<Mutex<AppState>>>) -> 
     Ok(())
 }
 
+/// Every detected install as [paksPath, launcher, recommendReason | null], so the UI
+/// can ask which one to use. At most one install carries a reason.
+#[tauri::command]
+async fn list_game_installs() -> Vec<(String, &'static str, Option<&'static str>)> {
+    let installs = find_marvel_rivals();
+    let paths: Vec<PathBuf> = installs.iter().map(|(p, _)| p.clone()).collect();
+    let rec = if paths.len() > 1 { utils::recommend_install(&paths) } else { None };
+    installs
+        .into_iter()
+        .enumerate()
+        .map(|(i, (p, l))| {
+            let reason = rec.filter(|(r, _)| *r == i).map(|(_, why)| why);
+            (p.to_string_lossy().to_string(), l, reason)
+        })
+        .collect()
+}
+
+/// `paks` picks one of `list_game_installs`; without it the first install is used
+/// and the launcher is only set when there is a single install.
 #[tauri::command]
 async fn auto_detect_game_path(
+    paks: Option<String>,
     state: State<'_, Arc<Mutex<AppState>>>,
     window: Window,
 ) -> Result<String, String> {
-    match find_marvel_rivals() {
+    let installs = find_marvel_rivals();
+    let picked = match &paks {
+        Some(p) => installs
+            .iter()
+            .find(|(path, _)| path == &PathBuf::from(p))
+            .map(|(path, l)| (path.clone(), Some(*l))),
+        None => installs
+            .first()
+            .map(|(path, l)| (path.clone(), (installs.len() == 1).then_some(*l))),
+    };
+    match picked {
         Some((game_root, launcher)) => {
             // game_path is a direct subfolder of Paks (launch code walks up from it):
             // existing ~mods, else the only subfolder, else create ~mods when there are none.
@@ -9486,6 +9516,7 @@ fn main() {
             get_game_path,
             set_game_path,
             auto_detect_game_path,
+            list_game_installs,
             start_file_watcher,
             get_pak_files,
             get_pak_files_in_folder,

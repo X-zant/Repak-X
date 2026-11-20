@@ -32,7 +32,9 @@ import { MdDriveFileMoveOutline } from "react-icons/md"
 import { IoLayersSharp } from "react-icons/io5"
 import { FaTag, FaToolbox, FaSort } from "react-icons/fa6"
 import { IoMdWifi, IoIosSettings, IoMdWarning } from "react-icons/io"
-import { VscListTree } from "react-icons/vsc"
+import { VscListTree, VscFolderOpened } from "react-icons/vsc"
+import { FaSteam } from "react-icons/fa"
+import { SiEpicgames } from "react-icons/si"
 import { GrInstall } from "react-icons/gr"
 import { GiLightningTrio } from "react-icons/gi"
 import Checkbox from './components/ui/Checkbox'
@@ -112,7 +114,7 @@ const ASSET_EXPLORER_FOCUS_MOD_KEY = 'repakx:assetExplorer:focusModPath'
 import TitleBar from './components/TitleBar'
 
 import InstallModPanel from './components/InstallModPanel'
-import SettingsPanel from './components/SettingsPanel'
+import SettingsPanel, { LoadingBayIcon } from './components/SettingsPanel'
 import CreditsPanel from './components/CreditsPanel'
 import ToolsPanel from './components/ToolsPanel'
 import SharingPanel from './components/SharingPanel'
@@ -402,6 +404,8 @@ function App() {
   const [availableCategories, setAvailableCategories] = useState<string[]>([])
   const [showCharacterFilters, setShowCharacterFilters] = useState(false)
   const [showTypeFilters, setShowTypeFilters] = useState(false)
+  const [selectedFormats, setSelectedFormats] = useState<Set<string>>(new Set()) // 'enabled' | 'disabled' | 'iostore' | 'legacy' | 'hybrid' | 'encrypted'
+  const [showFormatFilters, setShowFormatFilters] = useState(false)
 
   // Search state with debounce
   const [searchQuery, setSearchQuery] = useState('') // Actual filter query (debounced)
@@ -445,6 +449,7 @@ function App() {
   const [newFolderFromInstall, setNewFolderFromInstall] = useState<NewFolderFromInstallState | null>(null) // { callback: (name) => void } when prompting for new folder from install panel
   const [renameFolderPrompt, setRenameFolderPrompt] = useState<RenameFolderPromptState | null>(null) // { folderId, currentName } when prompting for folder rename
   const [deleteTagConfirm, setDeleteTagConfirm] = useState<{ tag: string; modCount: number } | null>(null)
+  const [gameInstallChoices, setGameInstallChoices] = useState<[string, string, string | null][] | null>(null)
 
   // Update Mod State
   const [updateModState, setUpdateModState] = useState<UpdateModState>({
@@ -1119,6 +1124,7 @@ function App() {
       setSearchQuery('')
       setSelectedCharacters(new Set())
       setSelectedCategories(new Set())
+      setSelectedFormats(new Set())
       setFilterTag('')
       // Scroll even if this mod is already selected
       lastRevealedModRef.current = null
@@ -2102,10 +2108,18 @@ function App() {
     }
   }
 
-  const handleAutoDetect = async () => {
+  // paks: the install picked from the multi-install prompt
+  const handleAutoDetect = async (paks?: string) => {
     try {
       setLoading(true)
-      const path = await invoke('auto_detect_game_path') as any
+      if (!paks) {
+        const installs = await invoke('list_game_installs') as [string, string, string | null][]
+        if (installs.length > 1) {
+          setGameInstallChoices(installs)
+          return
+        }
+      }
+      const path = await invoke('auto_detect_game_path', { paks: paks ?? null }) as any
       setGamePath(path)
       setStatus('Game path detected: ' + path)
       // auto-detect may also have set the launcher in the backend
@@ -3149,6 +3163,19 @@ function App() {
       return false
     }
 
+    // Format filters: OR within a pair (enabled/disabled, iostore/legacy), AND across groups
+    if (selectedFormats.size > 0) {
+      const has = (k: string) => selectedFormats.has(k)
+      if ((has('enabled') || has('disabled')) && !has(mod.enabled ? 'enabled' : 'disabled')) return false
+      if (has('iostore') || has('legacy') || has('encrypted') || has('hybrid')) {
+        const d = modDetails[mod.path]
+        if (!d) return false // wait for details when filters active
+        if ((has('iostore') || has('legacy')) && !has(d.is_iostore ? 'iostore' : 'legacy')) return false
+        if (has('encrypted') && !(d.is_iostore && d.is_encrypted)) return false
+        if (has('hybrid') && !d.is_hybrid) return false
+      }
+    }
+
     // New: Multi-select Character/Hero and Category filters using Mod Detection API
     const hasCharFilter = selectedCharacters.size > 0
     const hasCatFilter = selectedCategories.size > 0
@@ -3815,7 +3842,7 @@ function App() {
           accentColor={accentColor}
           setAccentColor={handleAccentChange}
           gamePath={gamePath}
-          onAutoDetectGamePath={handleAutoDetect}
+          onAutoDetectGamePath={() => handleAutoDetect()}
           onBrowseGamePath={handleBrowseGamePath}
           isGamePathLoading={loading}
           setParallelProcessing={handleSetParallelProcessing}
@@ -3864,6 +3891,7 @@ function App() {
       <DropZoneOverlay
         isVisible={isDragging}
         folders={folders}
+        currentFolderId={selectedFolderId}
         isAprilFools={isAprilFools}
         onInstallDrop={() => {
           // Just signals intent - actual files come from Tauri event
@@ -3969,6 +3997,34 @@ function App() {
         accentColor="#ef4444"
         onConfirm={confirmDeleteTag}
         onCancel={() => setDeleteTagConfirm(null)}
+      />
+
+      <InputPromptModal
+        isOpen={!!gameInstallChoices}
+        mode="choice"
+        title="Multiple installations found"
+        description="Marvel Rivals is installed more than once. Which one should Repak X use?"
+        icon={<VscFolderOpened />}
+        // recommended install first
+        options={[...(gameInstallChoices ?? [])].sort((a, b) => Number(!!b[2]) - Number(!!a[2])).map(([paks, launcher, reason]) => ({
+          value: paks,
+          label: <>
+            {launcher === 'steam' ? <><FaSteam size={18} /> Steam</>
+              : launcher === 'epic' ? <><SiEpicgames size={16} /> Epic Games</>
+              : launcher === 'loadingbay' ? <><LoadingBayIcon size={16} /> Loading Bay</>
+              : launcher}
+            {reason && <span className="prompt-option-badge" title={`Recommended: ${reason}`}>Recommended · {reason}</span>}
+          </>,
+          detail: paks.replace(/[\\/]MarvelGame[\\/]Marvel[\\/]Content[\\/]Paks$/, ''),
+        }))}
+        onConfirm={(paks) => {
+          setGameInstallChoices(null)
+          handleAutoDetect(paks)
+        }}
+        onCancel={() => {
+          setGameInstallChoices(null)
+          setStatus('Game path detection cancelled')
+        }}
       />
 
       <UpdateModModal
@@ -4224,10 +4280,10 @@ function App() {
                 <div className="sidebar-filters-inner">
                   <div className="filter-title-row">
                     <div className="filter-label">FILTERS</div>
-                    {(selectedCharacters.size > 0 || selectedCategories.size > 0) && (
+                    {(selectedCharacters.size > 0 || selectedCategories.size > 0 || selectedFormats.size > 0) && (
                       <button
                         className="btn-ghost-mini"
-                        onClick={() => { setSelectedCharacters(new Set()); setSelectedCategories(new Set()) }}
+                        onClick={() => { setSelectedCharacters(new Set()); setSelectedCategories(new Set()); setSelectedFormats(new Set()) }}
                         title="Clear all filters"
                       >
                         Clear
@@ -4300,6 +4356,31 @@ function App() {
                     </div>
                   )}
                   </>}
+
+                  {/* Format Chips */}
+                  <div
+                    className="filter-section-header with-margin"
+                    onClick={() => setShowFormatFilters(v => !v)}
+                  >
+                    <div className="filter-label-secondary">Format {selectedFormats.size > 0 && `(${selectedFormats.size})`}</div>
+                    <span className="filter-chevron">{showFormatFilters ? '▼' : '▶'}</span>
+                  </div>
+                  {showFormatFilters && (
+                    <div className="filter-chips-scroll">
+                      {([['enabled', 'Enabled'], ['disabled', 'Disabled'], ['iostore', 'IoStore'], ['legacy', 'Legacy'], ['hybrid', 'Hybrid'], ['encrypted', 'Encrypted']] as const).map(([key, label]) => {
+                        const active = selectedFormats.has(key)
+                        return (
+                          <button
+                            key={key}
+                            className={`filter-chip-compact ${active ? 'active' : ''}`}
+                            onClick={() => setSelectedFormats(prev => { const next = new Set(prev); active ? next.delete(key) : next.add(key); return next; })}
+                          >
+                            {label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
               {/* Vertical Resize Handle */}
@@ -4325,7 +4406,7 @@ function App() {
                   getCount={(id: string) =>
                     id === 'all' ? baseFilteredMods.length : folderModCounts.get(id) ?? 0
                   }
-                  hasFilters={selectedCharacters.size > 0 || selectedCategories.size > 0}
+                  hasFilters={selectedCharacters.size > 0 || selectedCategories.size > 0 || selectedFormats.size > 0}
                 />
               </div>
             </div>
