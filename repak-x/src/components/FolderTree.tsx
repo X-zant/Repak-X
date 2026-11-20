@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { VscFolder, VscFolderOpened, VscLibrary, VscChevronRight, VscChevronDown } from 'react-icons/vsc';
 import './FolderTree.css';
 
@@ -106,6 +106,19 @@ const FolderNode = ({ node, selectedFolderId, onSelect, onDelete, getCount, hasF
         }
     }, [selectedFolderId, node]);
 
+    // While a mod card is being dragged (see useModDragToFolder), resting on a
+    // collapsed folder opens it so nested folders can be reached as drop targets.
+    const expandTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const cancelExpand = () => {
+        if (expandTimer.current) clearTimeout(expandTimer.current);
+        expandTimer.current = null;
+    };
+    useEffect(() => cancelExpand, []);
+    const handleMouseEnter = () => {
+        if (!hasChildren || isOpen || !document.body.classList.contains('mod-dragging')) return;
+        expandTimer.current = setTimeout(() => setIsOpen(true), 600);
+    };
+
     const handleToggle = () => {
         // e.stopPropagation(); // Allow click to bubble to close context menu
         setIsOpen(!isOpen);
@@ -146,6 +159,9 @@ const FolderNode = ({ node, selectedFolderId, onSelect, onDelete, getCount, hasF
                 className={`node-content ${isSelected ? 'selected' : ''} ${node.isVirtual ? 'virtual' : ''}`}
                 onClick={handleSelect}
                 onContextMenu={handleContextMenu}
+                data-folder-id={node.isVirtual ? undefined : node.id}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={cancelExpand}
                 style={{ opacity: node.isVirtual ? 0.8 : 1 }}
                 title={node.isVirtual ? 'Virtual Folder (Group)' : node.originalName}
             >
@@ -243,6 +259,7 @@ const FolderTree = ({ folders, selectedFolderId, onSelect, onDelete, getCount, h
                     <div
                         className={`node-content ${selectedFolderId === rootFolder.id ? 'selected' : ''}`}
                         onClick={() => onSelect(rootFolder.id)}
+                        data-folder-id={rootFolder.id}
                         onContextMenu={(e) => {
                             if (!onContextMenu) return;
                             e.preventDefault();

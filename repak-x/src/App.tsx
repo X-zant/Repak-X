@@ -406,6 +406,11 @@ function App() {
   const [showTypeFilters, setShowTypeFilters] = useState(false)
   const [selectedFormats, setSelectedFormats] = useState<Set<string>>(new Set()) // 'enabled' | 'disabled' | 'iostore' | 'legacy' | 'hybrid' | 'encrypted'
   const [showFormatFilters, setShowFormatFilters] = useState(false)
+  // A dragged filters height only makes sense while a dropdown is open; once all
+  // are closed, drop it so the section shrinks back to its content.
+  useEffect(() => {
+    if (!showCharacterFilters && !showTypeFilters && !showFormatFilters) setFiltersHeight(null)
+  }, [showCharacterFilters, showTypeFilters, showFormatFilters])
 
   // Search state with debounce
   const [searchQuery, setSearchQuery] = useState('') // Actual filter query (debounced)
@@ -4362,7 +4367,7 @@ function App() {
                     className="filter-section-header with-margin"
                     onClick={() => setShowFormatFilters(v => !v)}
                   >
-                    <div className="filter-label-secondary">Format {selectedFormats.size > 0 && `(${selectedFormats.size})`}</div>
+                    <div className="filter-label-secondary">Properties {selectedFormats.size > 0 && `(${selectedFormats.size})`}</div>
                     <span className="filter-chevron">{showFormatFilters ? '▼' : '▶'}</span>
                   </div>
                   {showFormatFilters && (
@@ -4631,6 +4636,9 @@ function App() {
                 enableAnimations={enableAnimations}
                 onRenameBlocked={stableRenameBlocked}
                 onDeleteBlocked={stableDeleteBlocked}
+                onDropToFolder={(modPath, folderId) =>
+                  // Dragging a selected card moves the whole selection, like the context menu
+                  selectedMods.has(modPath) ? handleAssignToFolder(folderId) : handleMoveSingleMod(modPath, folderId)}
               />
             </div>
           </motion.div>

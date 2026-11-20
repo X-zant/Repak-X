@@ -11,6 +11,7 @@ import { toTagArray } from '../utils/tags'
 import { formatFileSize } from '../utils/format'
 import { detectHeroesWithData } from '../utils/heroes'
 import { useHoverTextReveal } from '../hooks/useHoverTextReveal'
+import { useModDragToFolder } from '../hooks/useModDragToFolder'
 import { FALLBACK_HERO_ID, resolveHeroImage, useHeroImages } from '../utils/heroImages'
 import './ModsList.css'
 import './ModDetailsPanel.css'
@@ -111,6 +112,8 @@ type ModsListProps = {
     onDeleteBlocked?: () => void
     holdToDelete?: boolean
     enableAnimations?: boolean
+    /** Fired when a card is dragged onto a folder tree node */
+    onDropToFolder?: (modPath: string, folderId: string) => void
 }
 
 // Get hero image by character ID, with name-based fallback.
@@ -594,8 +597,13 @@ export default function ModsList({
     onRenameBlocked,
     onDeleteBlocked,
     holdToDelete,
-    enableAnimations = true
+    enableAnimations = true,
+    onDropToFolder
 }: ModsListProps) {
+    const drag = useModDragToFolder(
+        (path, folderId) => onDropToFolder?.(path, folderId),
+        (path) => selectedMods.has(path) ? selectedMods.size : 1
+    )
     // Stem key: a toggle renames the file but must not remount the card. An enabled
     // and a disabled copy of one mod share a stem though, and duplicate keys leave
     // ghost cards behind that no refresh removes - the later copy keys on its path.
@@ -626,7 +634,7 @@ export default function ModsList({
     }, [viewMode]) // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
-        <div className="mods-list-wrapper" ref={wrapperRef}>
+        <div className="mods-list-wrapper" ref={wrapperRef} {...(onDropToFolder ? drag : {})}>
             <div
                 key={viewMode}
                 ref={gridRef}

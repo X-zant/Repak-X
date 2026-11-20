@@ -28,6 +28,11 @@
     background-color: var(--bg-light);
 }
 
+.folder-tree .node-content.drop-target {
+    background-color: color-mix(in srgb, var(--accent-primary), transparent 70%);
+    outline: 1px dashed var(--accent-primary);
+}
+
 .folder-tree .node-content.selected {
     background-color: color-mix(in srgb, var(--accent-primary), transparent 85%);
     color: var(--accent-primary);
@@ -68,7 +73,7 @@
 
 /* Specific styles for FolderTree that might differ from FileTree */
 .folder-tree .folder-count {
-    font-size: var(--fs-xs);
+    font-size: var(--fs-xs);
     margin-left: 8px;
   color: var(--text-secondary);
 }

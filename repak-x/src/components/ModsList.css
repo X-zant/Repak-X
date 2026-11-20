@@ -720,3 +720,32 @@
     position: relative;
     z-index: 1;
 }
+/* Drag a card onto the folder tree (see hooks/useModDragToFolder) */
+.mod-drag-ghost {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 10000;
+    pointer-events: none;
+    max-width: 260px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--accent-primary);
+    background: color-mix(in srgb, var(--accent-primary), var(--bg-darkest) 85%);
+    color: var(--text-primary, inherit);
+    font-size: var(--fs-sm, 13px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+body.mod-dragging,
+body.mod-dragging * {
+    cursor: grabbing !important;
+    user-select: none !important;
+}
+
+.mod-card.drag-source {
+    opacity: 0.45;
+}
