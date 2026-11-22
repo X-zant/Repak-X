@@ -442,7 +442,7 @@ export default function InstallModPanel({ mods, allTags, folders = [], currentFo
                           </span>
                         )}
                         <span className={`category-badge ${category.toLowerCase().replace(/\s+/g, '-')}-badge`}>
-                          {category}
+                          {category === 'Unknown' ? 'Other' : category}
                         </span>
                         {additional.map(tag => (
                           <span key={tag} className={`additional-badge ${tag.toLowerCase().replace(/\s+/g, '-')}-badge`}>

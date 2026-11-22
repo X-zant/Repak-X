@@ -3,13 +3,10 @@ pub mod iotoc;
 pub mod pak_files;
 
 use crate::install_mod::InstallableMod;
-use dirs;
 use iotoc::convert_to_iostore_directory;
 use log::{error, info, warn};
 use pak_files::create_repak_from_pak;
 use regex_lite::Regex;
-use serde_json;
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
@@ -276,34 +273,17 @@ pub fn normalize_mod_base_name(name: &str, min_nines: usize) -> String {
     )
 }
 
-pub fn record_installed_tags(base_name: &str, tags: &Vec<String>) {
+pub fn record_installed_tags(installed_pak: &Path, tags: &[String]) {
     if tags.is_empty() {
         return;
     }
-    let mut cfg_dir = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-    cfg_dir.push("Repak-X");
-    let _ = fs::create_dir_all(&cfg_dir);
-    let mut path = cfg_dir.clone();
-    path.push("pending_custom_tags.json");
-
-    let mut map: BTreeMap<String, Vec<String>> = if path.exists() {
-        fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| serde_json::from_str::<BTreeMap<String, Vec<String>>>(&s).ok())
-            .unwrap_or_default()
-    } else {
-        BTreeMap::new()
-    };
-
-    let entry = map.entry(base_name.to_string()).or_default();
-    for t in tags {
-        if !entry.contains(t) {
-            entry.push(t.clone());
-        }
+    if let Err(e) = crate::mod_db::db().add_tags_at(installed_pak, tags) {
+        error!(
+            "Saving install tags for {} failed: {}",
+            installed_pak.display(),
+            e
+        );
     }
-    entry.sort();
-    entry.dedup();
-    let _ = fs::write(&path, serde_json::to_string_pretty(&map).unwrap());
 }
 
 /// Result of installing a single mod, used to report per-mod success/failure to the UI.
@@ -417,7 +397,10 @@ pub fn install_mods_in_viewport(
                 }
             }
             // Record tags for pickup by main app
-            record_installed_tags(&base, &installable_mod.custom_tags);
+            record_installed_tags(
+                &output_directory.join(format!("{}.pak", base)),
+                &installable_mod.custom_tags,
+            );
             if copy_errors.is_empty() {
                 results.push(ModInstallResult {
                     mod_name: installable_mod.mod_name.clone(),
@@ -468,7 +451,10 @@ pub fn install_mods_in_viewport(
                 }
                 Ok(_) => {
                     let base = normalize_mod_base_name(&installable_mod.mod_name, BASE_MOD_NINES);
-                    record_installed_tags(&base, &installable_mod.custom_tags);
+                    record_installed_tags(
+                        &output_directory.join(format!("{}.pak", base)),
+                        &installable_mod.custom_tags,
+                    );
                     results.push(ModInstallResult {
                         mod_name: installable_mod.mod_name.clone(),
                         success: true,
@@ -494,7 +480,10 @@ pub fn install_mods_in_viewport(
             let dest = output_directory.join(format!("{}.pak", &base));
             match std::fs::copy(&installable_mod.mod_path, &dest) {
                 Ok(_) => {
-                    record_installed_tags(&base, &installable_mod.custom_tags);
+                    record_installed_tags(
+                        &output_directory.join(format!("{}.pak", base)),
+                        &installable_mod.custom_tags,
+                    );
                     installed_mods_ptr.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     results.push(ModInstallResult {
                         mod_name: installable_mod.mod_name.clone(),

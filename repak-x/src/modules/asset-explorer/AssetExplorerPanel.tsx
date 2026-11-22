@@ -850,7 +850,7 @@ function AssetDetail({ node, index, conflicting, onClose, onRevealMod }: AssetDe
                     const mod = index.mods[node.row.modIndex]
                     return (
                         <div className="ae-detail-rows">
-                            <div><span>Category</span><span>{mod.category || 'Unknown'}</span></div>
+                            <div><span>Category</span><span>{!mod.category || mod.category === 'Unknown' ? 'Other' : mod.category}</span></div>
                             {mod.character_name && (
                                 <div><span>Character</span><span>{mod.character_name}</span></div>
                             )}

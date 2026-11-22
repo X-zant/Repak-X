@@ -10,6 +10,7 @@ mod discord_presence;
 mod hero_assets;
 mod install_mod;
 mod merge_command;
+mod mod_db;
 mod p2p_libp2p;
 mod p2p_manager;
 mod p2p_sharing;
@@ -179,34 +180,13 @@ struct AppState {
     trash_days: u32,
 
     custom_tag_catalog: Vec<String>,
-    #[serde(default)]
+    /// Legacy: tags now live in mods.db. Read once by `migrate_tags_into_db`,
+    /// written back only if that import failed, so nothing is lost.
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
     mod_tags: std::collections::HashMap<String, Vec<String>>,
     /// Last known crash folder name for detecting crashes from previous sessions
     #[serde(default)]
     last_known_crash_folder: Option<String>,
-    /// Cache for mod details to avoid redundant PAK opens (path -> (fingerprint, details))
-    #[serde(skip)]
-    mod_details_cache: std::collections::HashMap<PathBuf, (ModFingerprint, ModDetails)>,
-}
-
-/// `(mtime, len)` of a mod's `.pak` and its `.utoc`/`.ucas` siblings.
-///
-/// The `.pak` of an IoStore mod is a tiny stub whose mtime can survive a re-export
-/// while the real content in the `.utoc`/`.ucas` changes, so the details cache has
-/// to key on all three files rather than the `.pak` mtime alone.
-type ModFingerprint = [Option<(std::time::SystemTime, u64)>; 3];
-
-fn mod_fingerprint(path: &std::path::Path) -> ModFingerprint {
-    let stat = |p: PathBuf| {
-        std::fs::metadata(p)
-            .ok()
-            .and_then(|m| m.modified().ok().map(|t| (t, m.len())))
-    };
-    [
-        stat(path.to_path_buf()),
-        stat(path.with_extension("utoc")),
-        stat(path.with_extension("ucas")),
-    ]
 }
 
 impl Default for AppState {
@@ -238,7 +218,6 @@ impl Default for AppState {
             custom_tag_catalog: Vec::new(),
             mod_tags: std::collections::HashMap::new(),
             last_known_crash_folder: None,
-            mod_details_cache: std::collections::HashMap::new(),
         }
     }
 }
@@ -831,8 +810,7 @@ async fn get_pak_files(state: State<'_, Arc<Mutex<AppState>>>) -> Result<Vec<Mod
                 }
             }
 
-            let key = get_mod_key(&path);
-            let custom_tags = state.mod_tags.get(&key).cloned().unwrap_or_default();
+            let custom_tags = mod_db::db().tags_at(path);
 
             mods.push(ModEntry {
                 path: path.to_path_buf(),
@@ -848,6 +826,12 @@ async fn get_pak_files(state: State<'_, Arc<Mutex<AppState>>>) -> Result<Vec<Mod
                 skin_name: None,
             });
         }
+    }
+
+    let files: Vec<PathBuf> = mods.iter().map(|m| m.path.clone()).collect();
+    let mut tags = mod_db::db().sync_library(game_path, &files);
+    for m in &mut mods {
+        m.custom_tags = tags.remove(&m.path).unwrap_or_default();
     }
 
     let enabled = mods.iter().filter(|m| m.enabled).count();
@@ -977,8 +961,7 @@ async fn get_pak_files_in_folder(
                 }
             }
 
-            let key = get_mod_key(&path);
-            let custom_tags = state.mod_tags.get(&key).cloned().unwrap_or_default();
+            let custom_tags = mod_db::db().tags_at(path);
 
             mods.push(ModEntry {
                 path: path.to_path_buf(),
@@ -1001,11 +984,7 @@ async fn get_pak_files_in_folder(
 }
 
 #[tauri::command]
-async fn set_mod_priority(
-    mod_path: String,
-    priority: usize,
-    state: State<'_, Arc<Mutex<AppState>>>,
-) -> Result<(), String> {
+async fn set_mod_priority(mod_path: String, priority: usize) -> Result<(), String> {
     let path = PathBuf::from(&mod_path);
     if !path.exists() {
         return Err("Mod file does not exist".to_string());
@@ -1068,11 +1047,8 @@ async fn set_mod_priority(
     }
 
     rename_mod_files(&path, &new_path).map_err(|e| format!("Failed to rename mod: {}", e))?;
-
-    // Invalidate cache for old path
-    {
-        let mut state_guard = state.lock().unwrap();
-        state_guard.mod_details_cache.remove(&path);
+    if let Err(e) = mod_db::db().moved(&path, &new_path) {
+        error!("Moving the re-prioritized mod in mods.db failed: {}", e);
     }
 
     Ok(())
@@ -3507,12 +3483,6 @@ async fn delete_mod(
         log::warn!("Main mod file does not exist: {:?}", actual_path);
     }
 
-    // Invalidate cache for deleted path
-    {
-        let mut state_guard = state.lock().unwrap();
-        state_guard.mod_details_cache.remove(&actual_path);
-    }
-
     // Determine the base path for IoStore files (always based on .pak name, not .bak_repak)
     let base_pak_path = if is_disabled || path.ends_with(".bak_repak") {
         // For disabled mods, derive the .pak base path
@@ -3700,20 +3670,9 @@ async fn update_mod(
 
     info!("Preserved install subfolder: {}", install_subfolder);
 
-    // Migrate the old mod's custom tags
-    let old_custom_tags = {
-        let mut state_guard = state.lock().unwrap();
-        let old_key = get_mod_key(&actual_old_path);
-        state_guard.mod_tags.remove(&old_key).unwrap_or_default()
-    };
 
     // (Deprecated old metadata)
-    let (old_custom_name, old_folder_id) = (None::<String>, None::<String>);
-
-    info!(
-        "Preserved metadata - custom_name: {:?}, tags: {:?}, folder_id: {:?}",
-        old_custom_name, old_custom_tags, old_folder_id
-    );
+    let old_custom_name = None::<String>;
 
     // Get the old mod's base name (for naming the new mod if preserve_name is true)
     let old_mod_name = actual_old_path
@@ -3868,13 +3827,9 @@ async fn update_mod(
             .join(&new_mod_filename)
     };
 
-    {
-        let mut state_guard = state.lock().unwrap();
-        let new_key = get_mod_key(&new_mod_path);
-        if !old_custom_tags.is_empty() {
-            state_guard.mod_tags.insert(new_key, old_custom_tags);
-            let _ = save_state(&state_guard);
-        }
+    // The new version keeps the old one's uid, so its tags carry over
+    if let Err(e) = mod_db::db().moved(&actual_old_path, &new_mod_path) {
+        error!("Moving the updated mod in mods.db failed: {}", e);
     }
 
     info!("Expected new mod path: {:?}", new_mod_path);
@@ -4342,19 +4297,8 @@ async fn rename_mod(
         return Err(error_msg);
     }
 
-    // Invalidate cache for old path and migrate tags
-    {
-        let mut state_guard = state.lock().unwrap();
-        state_guard.mod_details_cache.remove(&old_path_buf);
-
-        let old_key = get_mod_key(&old_path_buf);
-        let new_key = get_mod_key(&new_path);
-        if old_key != new_key {
-            if let Some(tags) = state_guard.mod_tags.remove(&old_key) {
-                state_guard.mod_tags.insert(new_key, tags);
-                let _ = save_state(&state_guard);
-            }
-        }
+    if let Err(e) = mod_db::db().moved(&old_path_buf, &new_path) {
+        error!("Moving the renamed mod in mods.db failed: {}", e);
     }
 
     info!(
@@ -4692,6 +4636,9 @@ async fn rename_folder(
         toast_events::emit_folder_rename_failed(&window, &error_msg);
         return Err(error_msg);
     }
+    if let Err(e) = mod_db::db().moved_folder(&old_path, &new_path) {
+        error!("Moving the renamed folder in mods.db failed: {}", e);
+    }
 
     Ok(new_id)
 }
@@ -4788,6 +4735,9 @@ async fn move_folder(
         toast_events::emit_folder_rename_failed(&window, &error_msg);
         return Err(error_msg);
     }
+    if let Err(e) = mod_db::db().moved_folder(&old_path, &new_path) {
+        error!("Moving the folder in mods.db failed: {}", e);
+    }
 
     Ok(new_id)
 }
@@ -4849,6 +4799,9 @@ async fn assign_mod_to_folder(
         toast_events::emit_move_failed(&window, &error_msg);
         return Err(error_msg);
     }
+    if let Err(e) = mod_db::db().moved(&source_path, &dest_path) {
+        error!("Moving the mod in mods.db failed: {}", e);
+    }
 
     Ok(())
 }
@@ -4866,15 +4819,10 @@ async fn add_custom_tag(
         state.custom_tag_catalog.sort();
     }
 
-    let key = get_mod_key(std::path::Path::new(&mod_path));
-    let tags = state.mod_tags.entry(key).or_insert_with(Vec::new);
-    if !tags.contains(&tag) {
-        tags.push(tag);
-        tags.sort();
-    }
-
     save_state(&state).map_err(|e| e.to_string())?;
-    Ok(())
+    mod_db::db()
+        .add_tags_at(Path::new(&mod_path), &[tag])
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -4907,22 +4855,10 @@ async fn delete_tag_from_all_mods(
 }
 
 #[tauri::command]
-async fn remove_custom_tag(
-    mod_path: String,
-    tag: String,
-    state: State<'_, Arc<Mutex<AppState>>>,
-) -> Result<(), String> {
-    let mut state = state.lock().unwrap();
-
-    let key = get_mod_key(std::path::Path::new(&mod_path));
-    if let Some(tags) = state.mod_tags.get_mut(&key) {
-        tags.retain(|t| t != &tag);
-        if tags.is_empty() {
-            state.mod_tags.remove(&key);
-        }
-    }
-
-    save_state(&state).map_err(|e| e.to_string())?;
+async fn remove_custom_tag(mod_path: String, tag: String) -> Result<(), String> {
+    mod_db::db()
+        .remove_tag_at(Path::new(&mod_path), &tag)
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -4972,14 +4908,6 @@ async fn toggle_mod(
         let error_msg = format!("Failed to toggle mod: {}", e);
         toast_events::emit_toggle_failed(&window, &error_msg);
         return Err(error_msg);
-    }
-
-    // Carry cached details over to the new path (rename keeps the mtime)
-    {
-        let mut state_guard = state.lock().unwrap();
-        if let Some(entry) = state_guard.mod_details_cache.remove(&path) {
-            state_guard.mod_details_cache.insert(new_path, entry);
-        }
     }
 
     Ok(!is_enabled)
@@ -6054,16 +5982,6 @@ fn utoc_for_mod(mod_path: &std::path::Path) -> Result<PathBuf, String> {
     Ok(utoc)
 }
 
-/// Drop cached details for a mod under both its enabled and disabled names, so the next
-/// `get_mod_details` re-reads it. The fingerprint already covers the .utoc/.ucas, so this is
-/// belt and braces.
-fn evict_mod_details(state: &Arc<Mutex<AppState>>, utoc: &std::path::Path) {
-    if let Ok(mut guard) = state.lock() {
-        guard.mod_details_cache.remove(&utoc.with_extension("pak"));
-        guard.mod_details_cache.remove(&utoc.with_extension("bak_repak"));
-    }
-}
-
 /// Turn one obfuscated (AES-encrypted) IoStore mod back into a plain one, in place.
 ///
 /// `mod_path` may be the mod's `.pak`, its disabled `.bak_repak`, or its `.utoc`. Only the
@@ -6072,10 +5990,7 @@ fn evict_mod_details(state: &Arc<Mutex<AppState>>, utoc: &std::path::Path) {
 /// plain is left alone and comes back with `was_encrypted: false`.
 /// `ModDetails.is_encrypted` tells the frontend which mods this applies to.
 #[tauri::command]
-async fn deobfuscate_mod(
-    mod_path: String,
-    state: State<'_, Arc<Mutex<AppState>>>,
-) -> Result<DeobfuscateModResult, String> {
+async fn deobfuscate_mod(mod_path: String) -> Result<DeobfuscateModResult, String> {
     let utoc = utoc_for_mod(std::path::Path::new(&mod_path))?;
 
     ui_log::info("Deobfuscate", format!("Deobfuscating {}", utoc.display()));
@@ -6085,7 +6000,6 @@ async fn deobfuscate_mod(
             e.to_string()
         })?;
 
-    evict_mod_details(&state, &utoc);
     ui_log::info("Deobfuscate", result.message.clone());
 
     Ok(DeobfuscateModResult {
@@ -6154,7 +6068,6 @@ async fn deobfuscate_all_mods(
 
         match uasset_toolkit::deobfuscate_iostore(&path, None, None) {
             Ok(r) => {
-                evict_mod_details(&state, utoc);
                 result.deobfuscated += 1;
                 result.details.push(DeobfuscateDetail {
                     mod_name,
@@ -7840,7 +7753,51 @@ fn load_state() -> AppState {
         AppState::default()
     };
 
+    mod_db::db().set_root(&state.game_path);
+    migrate_tags_into_db(&mut state);
     state
+}
+
+/// Moves tags out of state.json and the old install sidecar into mods.db.
+/// Idempotent: on failure both sources are kept and the next launch retries.
+fn migrate_tags_into_db(state: &mut AppState) {
+    let sidecar = app_dir().join("pending_custom_tags.json");
+    let mut tags = std::mem::take(&mut state.mod_tags);
+    let sidecar_tags = std::fs::read_to_string(&sidecar).ok().and_then(|s| {
+        serde_json::from_str::<std::collections::HashMap<String, Vec<String>>>(&s).ok()
+    });
+    // Sidecar keys are install base names ("!Name_9999999_P"), not mod keys
+    for (base, t) in sidecar_tags.unwrap_or_default() {
+        let key = get_mod_key(Path::new(&format!("{}.pak", base)));
+        tags.entry(key).or_default().extend(t);
+    }
+    if tags.is_empty() && !sidecar.exists() {
+        return;
+    }
+
+    let imported = mod_db::db().import_tags(&tags);
+    match imported {
+        Ok(()) => {
+            if let Err(e) = save_state(state) {
+                error!("Saving state.json after the tag migration failed: {}", e);
+            }
+            let _ = std::fs::remove_file(&sidecar);
+            ui_log::info(
+                "Mod database",
+                format!(
+                    "Moved tags for {} mod(s) from state.json into mods.db",
+                    tags.len()
+                ),
+            );
+        }
+        Err(e) => {
+            error!(
+                "Moving tags into mods.db failed, keeping them in state.json: {}",
+                e
+            );
+            state.mod_tags = tags;
+        }
+    }
 }
 
 /// Opening block of the log drawer: the facts every support conversation opens
@@ -7876,6 +7833,10 @@ fn emit_session_banner(app: &tauri::App) {
         }
     }
 
+    ui_log::info(
+        "Startup",
+        format!("Mod database: {}", mod_db::db().summary()),
+    );
     ui_log::debug(
         "Startup",
         format!("Log file: {}", log_dir().join("repakx.log").display()),
@@ -7979,7 +7940,7 @@ fn setup_logging() {
     }));
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct ModDetails {
     mod_name: String,
     mod_type: String,
@@ -7999,20 +7960,16 @@ struct ModDetails {
 async fn get_mod_details(
     mod_path: String,
     _detect_blueprint: Option<bool>,
-    state: State<'_, Arc<Mutex<AppState>>>,
 ) -> Result<ModDetails, String> {
-    compute_mod_details(&PathBuf::from(&mod_path), &state)
+    compute_mod_details(&PathBuf::from(&mod_path))
 }
 
 /// The body of [`get_mod_details`], callable from other commands.
 ///
 /// Split out so the Asset Explorer can build its index over every installed
-/// mod through the same mtime-keyed cache instead of issuing one IPC round-trip
+/// mod through the same persisted details cache instead of issuing one IPC round-trip
 /// per mod and re-opening PAKs the main window has already read.
-fn compute_mod_details(
-    path: &PathBuf,
-    state: &Arc<Mutex<AppState>>,
-) -> Result<ModDetails, String> {
+fn compute_mod_details(path: &PathBuf) -> Result<ModDetails, String> {
     let path = path.clone();
 
     info!("Getting details for mod: {}", path.display());
@@ -8021,22 +7978,19 @@ fn compute_mod_details(
         return Err(format!("Mod file does not exist: {}", path.display()));
     }
 
-    // --- Cache check ---
-    let fingerprint = mod_fingerprint(&path);
-
-    {
-        let state_guard = state.lock().unwrap();
-        if let Some((cached_fingerprint, cached_details)) =
-            state_guard.mod_details_cache.get(&path)
-        {
-            if *cached_fingerprint == fingerprint {
-                // Once per mod, and a hit is the uninteresting case
-                debug!("Cache hit for mod: {}", path.display());
-                return Ok(cached_details.clone());
-            } else {
-                info!("Cache stale for mod: {} (files changed)", path.display());
-            }
-        }
+    // --- Cache check (persisted in mods.db, survives restarts and toggles) ---
+    let stamp = mod_db::stamp(&path);
+    let cached = mod_db::db().cached_details(&stamp);
+    if let Some(mut details) = cached.and_then(|j| serde_json::from_str::<ModDetails>(&j).ok()) {
+        // Once per mod, and a hit is the uninteresting case
+        debug!("Cache hit for mod: {}", path.display());
+        // The key ignores the path, so a renamed mod gets its current name back
+        details.mod_name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Unknown")
+            .to_string();
+        return Ok(details);
     }
     info!("Cache miss for mod: {}, opening PAK...", path.display());
     // --- End cache check ---
@@ -8061,8 +8015,9 @@ fn compute_mod_details(
             .map(|entry| entry.file_path.clone())
             .collect();
 
-        // For Hybrid detection: Check if the .pak file also contains raw assets
-        if path.exists() && path.extension().unwrap_or_default() == "pak" {
+        // For Hybrid detection: Check if the .pak file also contains raw assets.
+        // Any enabled/disabled name: the cached answer is shared across a toggle.
+        if path.exists() {
             if let Ok(listing) = uasset_toolkit::list_pak(
                 path.to_str().unwrap_or_default(),
                 Some(crate::install_mod::AES_KEY_HEX),
@@ -8191,12 +8146,16 @@ fn compute_mod_details(
     };
 
     // --- Cache store ---
-    {
-        let mut state_guard = state.lock().unwrap();
-        state_guard
-            .mod_details_cache
-            .insert(path.clone(), (fingerprint, details.clone()));
-        info!("Cached details for mod: {}", path.display());
+    let stored = serde_json::to_string(&details)
+        .map_err(|e| e.to_string())
+        .and_then(|json| {
+            mod_db::db()
+                .store_details(&stamp, &json)
+                .map_err(|e| e.to_string())
+        });
+    match stored {
+        Ok(()) => info!("Cached details for mod: {}", path.display()),
+        Err(e) => warn!("Caching details for {} failed: {}", path.display(), e),
     }
     // --- End cache store ---
 
@@ -8243,7 +8202,6 @@ async fn get_asset_explorer_index(
 
     ui_log::info("Asset Explorer", "Building asset index for all mods...");
 
-    let inner = (*state).clone();
     let mut mods: Vec<AssetExplorerMod> = Vec::new();
     let mut failed: Vec<AssetExplorerFailure> = Vec::new();
     let mut total_assets = 0usize;
@@ -8267,7 +8225,7 @@ async fn get_asset_explorer_index(
             .to_string();
         let display_name = clean_mod_display_name(&file_name);
 
-        let details = match compute_mod_details(&path.to_path_buf(), &inner) {
+        let details = match compute_mod_details(&path.to_path_buf()) {
             Ok(d) => d,
             Err(e) => {
                 ui_log::warn(

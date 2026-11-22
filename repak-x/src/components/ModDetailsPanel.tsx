@@ -253,7 +253,7 @@ export default function ModDetailsPanel({ mod, initialDetails, onClose, characte
                   </Tooltip>
                 )}
                 <div className={`category-badge ${details.category ? details.category.toLowerCase().replace(/\s+/g, '-') + '-badge' : ''}`} title="Mod Type">
-                  {details.category || 'Unknown'}
+                  {!details.category || details.category === 'Unknown' ? 'Other' : details.category}
                 </div>
                 {/* Render additional categories (Blueprint, Text) */}
                 {additionalBadges.map(cat => (

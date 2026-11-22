@@ -4352,9 +4352,9 @@ function App() {
                             key={cat}
                             className={`filter-chip-compact ${active ? 'active' : ''}`}
                             onClick={() => setSelectedCategories(prev => { const next = new Set(prev); active ? next.delete(cat) : next.add(cat); return next; })}
-                            title={cat}
+                            title={cat === 'Unknown' ? 'Other' : cat}
                           >
-                            {cat}
+                            {cat === 'Unknown' ? 'Other' : cat}
                           </button>
                         )
                       })}
