@@ -90,6 +90,7 @@ import { toTagArray } from './utils/tags'
 import { detectHeroes, PROJECT_GALACTA_HERO_ID } from './utils/heroes'
 import { formatFileSize, normalizeModBaseName } from './utils/format'
 import { countModsInPaths, getAdditionalCategories } from './utils/mods'
+import { monoAccent, isMonoAccent, MONO_AURORA_PALETTES, applyOnAccent } from './utils/accent'
 
 const ACCENT_COLORS_MAP: Record<string, string> = {
   red: '#be1c1c',
@@ -107,6 +108,7 @@ const AURORA_PALETTES: Record<string, string[]> = {
   '#4CAF50': ['#4CAF50', '#8bc34a', '#00e676', '#e91e63'], // Green: nature with pop
   '#ff9800': ['#ff9800', '#ff5722', '#ffc107', '#4a9eff'], // Orange: sunset vibes
   '#FF96BC': ['#FF96BC', '#f472b6', '#c084fc', '#fda4af'], // Pink: soft pastel tones
+  ...MONO_AURORA_PALETTES,
 };
 
 const VFX_UPDATER_MOD_PREFILL_KEY = 'repakx:vfxUpdater:modPath'
@@ -3584,7 +3586,8 @@ function App() {
   const saveAllSettings = async (overrides: Partial<AppSettings>) => {
     // 1. Determine new values (merging overrides with current React state)
     const newTheme = overrides.theme !== undefined ? overrides.theme : theme;
-    const newAccentColor = overrides.accentColor !== undefined ? overrides.accentColor : accentColor;
+    const requestedAccent = overrides.accentColor !== undefined ? overrides.accentColor : accentColor;
+    const newAccentColor = isMonoAccent(requestedAccent) ? monoAccent(newTheme) : requestedAccent;
     const newViewMode = (overrides.viewMode !== undefined ? overrides.viewMode : viewMode) as ViewMode;
     const newHideSuffix = overrides.hideSuffix !== undefined ? overrides.hideSuffix : hideSuffix;
     const newAutoOpenDetails = overrides.autoOpenDetails !== undefined ? overrides.autoOpenDetails : autoOpenDetails;
@@ -3607,7 +3610,9 @@ function App() {
     const newTrashDays = overrides.trashDays !== undefined ? overrides.trashDays : trashDays;
 
     // 2. Map newAccentColor from hex to the preset name if it is a hex value
-    const accentName = Object.keys(ACCENT_COLORS_MAP).find(key => ACCENT_COLORS_MAP[key] === newAccentColor) || newAccentColor;
+    const accentName = isMonoAccent(newAccentColor)
+      ? 'monochrome'
+      : Object.keys(ACCENT_COLORS_MAP).find(key => ACCENT_COLORS_MAP[key] === newAccentColor) || newAccentColor;
 
     // 3. Construct the payload for save_app_settings
     const payload: AppSettings = {
@@ -3643,8 +3648,9 @@ function App() {
       setTheme(newTheme);
       document.documentElement.setAttribute('data-theme', newTheme);
     }
-    if (overrides.accentColor !== undefined) {
+    if (overrides.accentColor !== undefined || newAccentColor !== accentColor) {
       setAccentColor(newAccentColor);
+      applyOnAccent(newAccentColor);
       document.documentElement.style.setProperty('--accent-primary', newAccentColor);
       document.documentElement.style.setProperty('--accent-secondary', newAccentColor);
       const palette = AURORA_PALETTES[newAccentColor] || ['#be1c1c', '#ff9800', '#ffcc00', '#ff6b35'];
@@ -3713,7 +3719,9 @@ function App() {
     invoke('get_app_settings')
       .then((settings: any) => {
         // Resolve hex code from accent preset name
-        const hexAccent = ACCENT_COLORS_MAP[settings.accentColor] || ACCENT_COLORS_MAP['red'] || '#be1c1c';
+        const hexAccent = settings.accentColor === 'monochrome'
+          ? monoAccent(settings.theme)
+          : ACCENT_COLORS_MAP[settings.accentColor] || ACCENT_COLORS_MAP['red'] || '#be1c1c';
 
         // 1. Apply Theme
         setTheme(settings.theme);
@@ -3721,6 +3729,7 @@ function App() {
 
         // 2. Apply Accent
         setAccentColor(hexAccent);
+        applyOnAccent(hexAccent);
         document.documentElement.style.setProperty('--accent-primary', hexAccent);
         document.documentElement.style.setProperty('--accent-secondary', hexAccent);
         const palette = AURORA_PALETTES[hexAccent] || ['#be1c1c', '#ff9800', '#ffcc00', '#ff6b35'];

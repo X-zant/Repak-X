@@ -593,7 +593,7 @@
     top: 0;
     bottom: 0;
     width: 2px;
-    background: var(--danger);
+    background: var(--warning);
 }
 
 .ae-chevron {
@@ -651,7 +651,7 @@
     align-items: center;
     gap: 3px;
     flex-shrink: 0;
-    color: var(--danger);
+    color: var(--warning);
     font-size: var(--fs-xs);
     font-weight: 700;
     font-variant-numeric: tabular-nums;
@@ -693,9 +693,9 @@
 }
 
 .ae-chip-conflict {
-    background: color-mix(in srgb, var(--danger), transparent 85%);
-    border-color: color-mix(in srgb, var(--danger), transparent 65%);
-    color: var(--danger);
+    background: color-mix(in srgb, var(--warning), transparent 85%);
+    border-color: color-mix(in srgb, var(--warning), transparent 65%);
+    color: var(--warning);
 }
 
 /* The kind chip is redundant with the dot at narrow widths, so it goes first. */
@@ -939,7 +939,7 @@
     gap: 4px;
     border: none;
     background: none;
-    color: var(--danger);
+    color: var(--warning);
     font-size: var(--fs-xs);
     /* No vertical padding: the bar is height-pinned, so any would only crop. */
     line-height: 1;
@@ -950,11 +950,11 @@
 }
 
 .ae-status-conflicts strong {
-    color: var(--danger);
+    color: var(--warning);
 }
 
 .ae-status-conflicts:hover {
-    background: color-mix(in srgb, var(--danger), transparent 88%);
+    background: color-mix(in srgb, var(--warning), transparent 88%);
 }
 
 .ae-status-failed {

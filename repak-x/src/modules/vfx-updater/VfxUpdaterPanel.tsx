@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { resolveMonoAccent, MONO_AURORA_PALETTES, applyOnAccent } from "../../utils/accent";
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion";
 import { usePipeline } from "./hooks/usePipeline";
 import { updatedModOutputBase } from "./lib/outputName";
@@ -197,6 +198,7 @@ export default function VfxUpdaterPanel() {
       '#4CAF50': ['#4CAF50', '#8bc34a', '#00e676', '#e91e63'],
       '#ff9800': ['#ff9800', '#ff5722', '#ffc107', '#4a9eff'],
       '#FF96BC': ['#FF96BC', '#f472b6', '#c084fc', '#fda4af'],
+      ...MONO_AURORA_PALETTES,
     };
 
     const ACCENT_COLORS_MAP: Record<string, string> = {
@@ -209,8 +211,9 @@ export default function VfxUpdaterPanel() {
     };
 
     const applyTheme = (themeStr: string, accentStr: string) => {
-      const hexAccent = ACCENT_COLORS_MAP[accentStr] || accentStr || '#4a9eff';
+      const hexAccent = ACCENT_COLORS_MAP[accentStr] || resolveMonoAccent(accentStr, themeStr) || '#4a9eff';
       document.documentElement.setAttribute('data-theme', themeStr);
+      applyOnAccent(hexAccent);
       document.documentElement.style.setProperty('--accent-primary', hexAccent);
       document.documentElement.style.setProperty('--accent-secondary', hexAccent);
 

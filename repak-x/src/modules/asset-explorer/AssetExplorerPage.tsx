@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { resolveMonoAccent, MONO_AURORA_PALETTES, applyOnAccent } from '../../utils/accent'
 import TitleBar from '../../components/TitleBar'
 import { useGlobalTooltips } from '../../hooks/useGlobalTooltips'
 import AssetExplorerPanel from './AssetExplorerPanel'
@@ -27,6 +28,7 @@ const AURORA_PALETTES: Record<string, string[]> = {
     '#4CAF50': ['#4CAF50', '#a3e635', '#22d3ee', '#34d399'],
     '#ff9800': ['#ff9800', '#facc15', '#fb7185', '#fbbf24'],
     '#FF96BC': ['#FF96BC', '#f472b6', '#c084fc', '#fda4af'],
+    ...MONO_AURORA_PALETTES,
 }
 
 export default function AssetExplorerPage() {
@@ -39,8 +41,9 @@ export default function AssetExplorerPage() {
     // saved theme themselves and follow it when the main window changes it.
     useEffect(() => {
         const applyTheme = (theme: string, accent: string) => {
-            const hexAccent = ACCENT_COLORS_MAP[accent] || accent || '#4a9eff'
+            const hexAccent = ACCENT_COLORS_MAP[accent] || resolveMonoAccent(accent, theme) || '#4a9eff'
             document.documentElement.setAttribute('data-theme', theme)
+            applyOnAccent(hexAccent)
             document.documentElement.style.setProperty('--accent-primary', hexAccent)
             document.documentElement.style.setProperty('--accent-secondary', hexAccent)
 

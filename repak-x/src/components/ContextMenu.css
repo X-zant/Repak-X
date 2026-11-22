@@ -40,6 +40,15 @@
   color: var(--on-accent);
 }
 
+.context-menu-item .warning-icon-small {
+  fill: var(--accent-primary);
+}
+
+.context-menu-item:hover .warning-icon-small,
+.context-menu-item:focus-visible .warning-icon-small {
+  fill: currentColor;
+}
+
 .context-menu-item-label {
   flex: 1;
   overflow: hidden;

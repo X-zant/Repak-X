@@ -150,7 +150,7 @@ button {
 .btn-primary {
   background: var(--accent-gradient);
   border-color: var(--accent-primary);
-  color: #ffffff;
+  color: var(--on-accent);
   /* Always white on colored background */
 }
 

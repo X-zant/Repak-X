@@ -26,4 +26,5 @@
 - Settings now auto-save when changes are made.
 - Mods dropped on the empty area of Quick Organize now install to the currently viewed folder instead of the root.
 - Improved Light Mode readability.
+- Added a Monochrome accent color: white in Dark Mode, black in Light Mode.
 - Performance optimizations.

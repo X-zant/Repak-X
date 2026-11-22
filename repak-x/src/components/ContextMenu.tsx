@@ -480,7 +480,7 @@ const ContextMenu = ({ x, y, mod, folder, onClose, onAssignTag, onNewTag, onMove
       <div className="context-menu-separator" />
 
       <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={() => { if (onCheckConflicts) onCheckConflicts(); onClose(); }}>
-        Check Conflicts <IoLayersSharp className="warning-icon-small" style={{ fill: 'var(--accent-primary)' }} />
+        Check Conflicts <IoLayersSharp className="warning-icon-small" />
       </div>
 
       <div role="menuitem" tabIndex={-1} className="context-menu-item" onClick={() => { if (onUpdateMod) onUpdateMod(); onClose(); }}>

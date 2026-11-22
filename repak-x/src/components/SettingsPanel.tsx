@@ -521,6 +521,12 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
                           title={name.charAt(0).toUpperCase() + name.slice(1)}
                         />
                       ))}
+                      <button
+                        className={`color-option mono ${accentColor === '#ffffff' || accentColor === '#000000' ? 'selected' : ''}`}
+                        style={{ background: 'linear-gradient(135deg, #ffffff 50%, #000000 50%)' }}
+                        onClick={() => setAccentColor(theme === 'light' ? '#000000' : '#ffffff')}
+                        title="Monochrome"
+                      />
                     </div>
                   </div>
                 </div>
