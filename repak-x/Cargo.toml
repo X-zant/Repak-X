@@ -65,7 +65,7 @@ sysinfo = "0.32"
 tokio = { version = "1", features = ["full"] }
 parking_lot = "0.12"
 
-# Local mod database (docs/MOD_DB_PLAN.md)
+# Local mod database
 rusqlite = { version = "0.32", features = ["bundled"] }
 blake3 = "1"
 

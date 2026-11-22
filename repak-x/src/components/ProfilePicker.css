@@ -1,0 +1,71 @@
+.profile-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* Fill the action bar like the dropdowns next to it */
+  height: 100%;
+}
+
+.profile-picker-dropdown {
+  min-width: 150px;
+  max-width: 220px;
+}
+
+.profile-picker-unsaved {
+  color: var(--accent-primary);
+  font-size: 1.5em;
+  font-weight: 700;
+  line-height: 1;
+  /* The glyph sits high; nudge it toward the text's middle */
+  transform: translateY(0.15em);
+  margin-right: auto;
+  cursor: help;
+}
+
+/* "New profile" reads as a plain menu entry here, not an accent call-to-action */
+.profile-picker-dropdown .custom-dropdown-item.add-new {
+  color: var(--text-primary);
+}
+
+/* Mods a profile has never seen, listed in the switch prompt */
+.profile-unknown-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--bg-darker);
+}
+
+.profile-unknown-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: var(--fs-sm);
+}
+
+.profile-unknown-list li:nth-child(odd) {
+  background: color-mix(in srgb, var(--text-primary), transparent 96%);
+}
+
+.profile-unknown-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.profile-unknown-state {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.profile-unknown-state.on {
+  color: var(--accent-primary);
+}

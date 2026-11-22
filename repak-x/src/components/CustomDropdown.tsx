@@ -12,10 +12,19 @@ type CustomDropdownProps = {
     className?: string;
     disabled?: boolean;
     onAddNew?: () => void;
-    addNewLabel?: string;
+    addNewLabel?: React.ReactNode;
     onDeleteOption?: (value: string) => void;
     alwaysShowDeleteIcon?: boolean;
+    /** Shown right after the selected label in the trigger (e.g. an unsaved marker) */
+    valueSuffix?: React.ReactNode;
+    /** Extra commands shown side by side under the options, above "Add New" */
+    actions?: { label: string; onClick: () => void; title?: string; icon?: React.ReactNode }[];
+    /** Double-clicking an option edits its label in place; called with the new label */
+    onRenameOption?: (value: string, label: string) => void;
 };
+
+/** How long a click waits to see if it becomes a double-click (rename) */
+const DOUBLE_CLICK_MS = 250;
 
 /**
  * A generic custom dropdown component.
@@ -39,15 +48,34 @@ const CustomDropdown = ({
     onAddNew,
     addNewLabel = "+ Add New",
     onDeleteOption,
-    alwaysShowDeleteIcon = false
+    alwaysShowDeleteIcon = false,
+    valueSuffix,
+    actions = [],
+    onRenameOption
 }: CustomDropdownProps) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement | null>(null);
+    /** Option being renamed in place, and its draft label */
+    const [editing, setEditing] = useState<{ value: string; original: string; text: string } | null>(null);
+    const editingRef = useRef(editing);
+    editingRef.current = editing;
+    const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Close dropdown when clicking outside
+    const commitRename = () => {
+        const current = editingRef.current;
+        setEditing(null);
+        const text = current?.text.trim();
+        if (current && text && text !== current.original) {
+            onRenameOption?.(current.value, text);
+        }
+    };
+
+    // Close dropdown when clicking outside (keeping a rename in progress)
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && event.target instanceof Node && !dropdownRef.current.contains(event.target)) {
+                // The input unmounts with the menu before its blur would fire
+                if (editingRef.current) commitRename();
                 setIsOpen(false);
             }
         };
@@ -91,7 +119,8 @@ const CustomDropdown = ({
                 style={disabled ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
             >
                 {icon && <span className="custom-dropdown-icon">{icon}</span>}
-                <span className="custom-dropdown-text">{getLabel(value)}</span>
+                <span className={`custom-dropdown-text ${valueSuffix ? 'has-suffix' : ''}`}>{getLabel(value)}</span>
+                {valueSuffix}
             </button>
 
             {isOpen && !disabled && (
@@ -118,12 +147,40 @@ const CustomDropdown = ({
                             return (
                                 <div
                                     key={`${optValue}-${index}`}
-                                    className={`custom-dropdown-item ${isSelected ? 'selected' : ''}`}
-                                    onClick={() => handleSelect(option)}
-                                    title={optLabel}
+                                    className={`custom-dropdown-item ${isSelected ? 'selected' : ''} ${editing?.value === optValue ? 'editing' : ''}`}
+                                    onClick={() => {
+                                        if (editing) return;
+                                        if (!onRenameOption) return handleSelect(option);
+                                        // Wait: a second click turns this into a rename, not a selection
+                                        if (clickTimer.current) clearTimeout(clickTimer.current);
+                                        clickTimer.current = setTimeout(() => handleSelect(option), DOUBLE_CLICK_MS);
+                                    }}
+                                    onDoubleClick={() => {
+                                        if (!onRenameOption) return;
+                                        if (clickTimer.current) clearTimeout(clickTimer.current);
+                                        setEditing({ value: optValue, original: optLabel, text: optLabel });
+                                    }}
+                                    title={onRenameOption ? `${optLabel} (double-click to rename)` : optLabel}
                                 >
-                                    <span className="custom-dropdown-item-label">{optLabel}</span>
-                                    {onDeleteOption && optValue && optShowDelete && (
+                                    {editing?.value === optValue ? (
+                                        <input
+                                            className="custom-dropdown-rename-input"
+                                            autoFocus
+                                            onFocus={e => e.target.select()}
+                                            value={editing.text}
+                                            onChange={e => setEditing({ ...editing, text: e.target.value })}
+                                            onClick={e => e.stopPropagation()}
+                                            onKeyDown={e => {
+                                                e.stopPropagation();
+                                                if (e.key === 'Enter') commitRename();
+                                                else if (e.key === 'Escape') setEditing(null);
+                                            }}
+                                            onBlur={commitRename}
+                                        />
+                                    ) : (
+                                        <span className="custom-dropdown-item-label">{optLabel}</span>
+                                    )}
+                                    {onDeleteOption && optValue && optShowDelete && editing?.value !== optValue && (
                                         <button
                                             className={`custom-dropdown-item-delete ${alwaysShowDeleteIcon ? 'always-visible' : ''}`}
                                             onClick={(e) => {
@@ -138,6 +195,25 @@ const CustomDropdown = ({
                                 </div>
                             );
                         })
+                    )}
+                    {actions.length > 0 && (
+                        <>
+                            <div className="custom-dropdown-separator" />
+                            <div className="custom-dropdown-actions">
+                                {actions.map(action => (
+                                    <button
+                                        key={action.label}
+                                        type="button"
+                                        className="custom-dropdown-action"
+                                        title={action.title}
+                                        onClick={() => { action.onClick(); setIsOpen(false); }}
+                                    >
+                                        {action.icon}
+                                        {action.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </>
                     )}
                     {onAddNew && (
                         <>

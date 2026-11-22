@@ -1,6 +1,7 @@
-//! Local mod database, `%APPDATA%/Repak-X/mods.db` (docs/MOD_DB_PLAN.md).
+//! Local mod database, `%APPDATA%/Repak-X/mods.db`.
 //! The only module that touches SQLite; every write goes through [`db()`].
 
+pub mod profiles;
 pub mod reconcile;
 
 use log::{error, warn};
@@ -12,7 +13,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-const SCHEMA_VERSION: i32 = 3;
+const SCHEMA_VERSION: i32 = 4;
 /// Scope shown in the log drawer
 const LOG_SCOPE: &str = "Mod database";
 /// Cached mod details kept; least recently used beyond this are evicted
@@ -164,20 +165,7 @@ fn fill_content_ids_in_background(root: PathBuf) {
     }
     std::thread::spawn(move || {
         let todo = db().missing_content_ids().unwrap_or_default();
-        let mut filled = 0;
-        for (uid, path, stamp) in &todo {
-            let Some(cid) = content_id(&root.join(path)) else {
-                continue;
-            };
-            // A stamp that moved on means the file changed meanwhile; the next scan redoes it
-            let result = db().conn.execute(
-                "UPDATE mods SET content_id = ?2 WHERE uid = ?1 AND stamp = ?3",
-                params![uid, cid, stamp],
-            );
-            if result.is_ok() {
-                filled += 1;
-            }
-        }
+        let filled = fill_content_ids(&root, &todo);
         if !todo.is_empty() {
             crate::ui_log::debug(
                 LOG_SCOPE,
@@ -190,6 +178,45 @@ fn fill_content_ids_in_background(root: PathBuf) {
         }
         FILLING.store(false, Ordering::SeqCst);
     });
+}
+
+/// Reads and stores the content id of each `(uid, path, stamp)`, taking the
+/// database lock only for each write. Returns how many were stored.
+fn fill_content_ids(root: &Path, todo: &[(String, String, String)]) -> usize {
+    let mut filled = 0;
+    for (uid, path, stamp) in todo {
+        let Some(cid) = content_id(&root.join(path)) else {
+            continue;
+        };
+        // A stamp that moved on means the file changed meanwhile; the next scan redoes it
+        let result = db().conn.execute(
+            "UPDATE mods SET content_id = ?2 WHERE uid = ?1 AND stamp = ?3",
+            params![uid, cid, stamp],
+        );
+        if result.is_ok() {
+            filled += 1;
+        }
+    }
+    filled
+}
+
+/// Installed mods that share a content id, as absolute paths, each group with
+/// at least two. Reads the file list only of mods whose content id is not known
+/// yet. Same content id means same file list, not same bytes: callers that act
+/// on it confirm with something stricter.
+pub fn same_content_groups(root: &Path) -> Vec<Vec<PathBuf>> {
+    let todo = db().missing_content_ids().unwrap_or_default();
+    fill_content_ids(root, &todo);
+
+    let rows = db().live_content_ids().unwrap_or_else(|e| {
+        error!("Reading content ids failed: {}", e);
+        Vec::new()
+    });
+    let mut groups: HashMap<String, Vec<PathBuf>> = HashMap::new();
+    for (path, cid) in rows {
+        groups.entry(cid).or_default().push(root.join(path));
+    }
+    groups.into_values().filter(|g| g.len() > 1).collect()
 }
 
 impl ModDb {
@@ -286,6 +313,9 @@ impl ModDb {
                  PRAGMA user_version = 3;
                  COMMIT;",
             )?;
+        }
+        if version < 4 {
+            self.conn.execute_batch(profiles::SCHEMA_V4)?;
         }
         Ok(())
     }
@@ -493,6 +523,15 @@ impl ModDb {
         rows.collect()
     }
 
+    fn live_content_ids(&self) -> rusqlite::Result<Vec<(String, String)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT path, content_id FROM mods
+             WHERE content_id IS NOT NULL AND orphaned_since IS NULL",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        rows.collect()
+    }
+
     fn load_rows(&self) -> rusqlite::Result<Vec<Row>> {
         let mut stmt = self
             .conn
@@ -621,6 +660,7 @@ impl ModDb {
                 }
                 Change::Purge { uid } => {
                     tx.execute("DELETE FROM tags WHERE uid = ?1", [uid])?;
+                    tx.execute("DELETE FROM profile_members WHERE uid = ?1", [uid])?;
                     tx.execute("DELETE FROM mods WHERE uid = ?1", [uid])?;
                 }
             }
@@ -717,6 +757,28 @@ mod tests {
             .unwrap();
         let moved = root.join("Heroes/Skins/Symbiote_9999999_P.bak_repak");
         assert_eq!(db.tags_at(&moved), ["wip"]);
+    }
+
+    #[test]
+    fn same_content_groups_pairs_live_rows_only() {
+        // The only test using the global (in-memory under test) database
+        db().conn
+            .execute_batch(
+                "INSERT INTO mods (uid, path_key, path, stamp, content_id, added_at, orphaned_since)
+                 VALUES ('a', 'x', 'X.pak', 's', 'c1', 0, NULL),
+                        ('b', 'y', 'Sub/Y.bak_repak', 's', 'c1', 0, NULL),
+                        ('c', 'z', 'Z.pak', 's', 'c2', 0, NULL),
+                        ('d', 'w', 'W.pak', 's', 'c1', 0, 5);",
+            )
+            .unwrap();
+        let root = Path::new("C:/mods");
+        let mut groups = same_content_groups(root);
+        assert_eq!(groups.len(), 1);
+        groups[0].sort();
+        assert_eq!(
+            groups[0],
+            [root.join("Sub/Y.bak_repak"), root.join("X.pak")]
+        );
     }
 
     #[test]

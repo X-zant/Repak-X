@@ -2408,7 +2408,10 @@ async fn quick_organize(
         target_folder.clone()
     };
 
-    quick_organize_impl(paths, output_dir, location_label, selections, renames, flatten, &window)
+    let copied =
+        quick_organize_impl(paths, output_dir, location_label, selections, renames, flatten, &window)?;
+    replace_spaces_in_mod_names(&mod_directory);
+    Ok(copied)
 }
 
 /// Locks the destination to wherever `existing_mod_path` currently lives instead of a
@@ -4118,9 +4121,75 @@ fn replace_mod_files(old: &Path, new: &Path) -> std::io::Result<()> {
     result
 }
 
+/// Replaces whitespace in the file name of every installed mod under `root` with `_`,
+/// along with its .utoc/.ucas. A mod whose new name is already taken is left as it
+/// was. Returns how many mods were renamed.
+fn replace_spaces_in_mod_names(root: &Path) -> usize {
+    if !root.is_dir() {
+        return 0;
+    }
+    // Collected up front so renaming doesn't disturb the walk
+    let files: Vec<PathBuf> = WalkDir::new(root)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .map(|e| e.into_path())
+        .filter(|p| {
+            p.is_file()
+                && matches!(
+                    p.extension().and_then(|e| e.to_str()),
+                    Some("pak" | "bak_repak" | "pak_disabled")
+                )
+        })
+        .collect();
+
+    mod_db::db().set_root(root);
+    let mut renamed = 0;
+    for old in files {
+        let Some(name) = old.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if !name.chars().any(char::is_whitespace) {
+            continue;
+        }
+        let new = old.with_file_name(name.replace(char::is_whitespace, "_"));
+        match rename_mod_files(&old, &new) {
+            Ok(()) => {
+                if let Err(e) = mod_db::db().moved(&old, &new) {
+                    error!("Moving the renamed mod in mods.db failed: {}", e);
+                }
+                renamed += 1;
+            }
+            Err(e) => warn!("Could not replace spaces in {}: {}", old.display(), e),
+        }
+    }
+    if renamed > 0 {
+        info!("Replaced spaces with underscores in {} mod name(s)", renamed);
+    }
+    renamed
+}
+
 #[cfg(test)]
 mod rename_mod_files_tests {
-    use super::{rename_mod_files, replace_mod_files};
+    use super::{rename_mod_files, replace_mod_files, replace_spaces_in_mod_names};
+
+    #[test]
+    fn spaces_become_underscores_for_the_whole_mod() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = |name: &str| dir.path().join(name);
+        std::fs::create_dir(p("sub")).unwrap();
+        for name in ["a b.pak", "a b.utoc", "a b.ucas", "sub/c d.bak_repak", "taken x.pak", "taken_x.pak"] {
+            std::fs::write(p(name), name).unwrap();
+        }
+
+        assert_eq!(replace_spaces_in_mod_names(dir.path()), 2);
+        for name in ["a_b.pak", "a_b.utoc", "a_b.ucas", "sub/c_d.bak_repak"] {
+            assert!(p(name).exists(), "{name} should exist");
+        }
+        assert!(!p("a b.pak").exists() && !p("a b.utoc").exists());
+        // The name was taken, so neither file is touched
+        assert_eq!(std::fs::read_to_string(p("taken x.pak")).unwrap(), "taken x.pak");
+        assert_eq!(std::fs::read_to_string(p("taken_x.pak")).unwrap(), "taken_x.pak");
+    }
 
     #[test]
     fn replace_removes_the_old_mods_side_files() {
@@ -5314,6 +5383,243 @@ async fn extract_mod_assets_inner(
     }
 }
 
+// ============================================================================
+// PROFILES (docs/MOD_DB_PLAN.md §6)
+// ============================================================================
+
+#[tauri::command]
+async fn get_profiles() -> Result<mod_db::profiles::ProfileStatus, String> {
+    mod_db::db().profile_status().map_err(|e| e.to_string())
+}
+
+fn profile_name(name: &str) -> Result<String, String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("Profile name cannot be empty".to_string());
+    }
+    Ok(name.to_string())
+}
+
+/// Saves the current enabled/disabled state as a new profile and makes it active.
+#[tauri::command]
+async fn create_profile(name: String) -> Result<String, String> {
+    let name = profile_name(&name)?;
+    let id = mod_db::db()
+        .create_profile(&name)
+        .map_err(|e| e.to_string())?;
+    ui_log::success("Profiles", format!("Created profile \"{}\"", name));
+    Ok(id)
+}
+
+#[tauri::command]
+async fn save_profile(id: String) -> Result<(), String> {
+    mod_db::db().save_profile(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn rename_profile(id: String, name: String) -> Result<(), String> {
+    let name = profile_name(&name)?;
+    mod_db::db()
+        .rename_profile(&id, &name)
+        .map_err(|e| e.to_string())
+}
+
+/// File names of installed mods the profile has never seen (a switch skips them).
+#[tauri::command]
+async fn get_profile_unknown_mods(id: String) -> Result<Vec<String>, String> {
+    let files = mod_db::db().unknown_mods(&id).map_err(|e| e.to_string())?;
+    Ok(files
+        .iter()
+        .map(|f| f.file_name().unwrap_or_default().to_string_lossy().to_string())
+        .collect())
+}
+
+/// Adds those mods to the profile: all enabled, all disabled, or (`None`) as they are now.
+#[tauri::command]
+async fn adopt_profile_unknown_mods(id: String, enabled: Option<bool>) -> Result<(), String> {
+    mod_db::db()
+        .adopt_unknown_mods(&id, enabled)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn delete_profile(id: String) -> Result<(), String> {
+    mod_db::db().delete_profile(&id).map_err(|e| e.to_string())
+}
+
+/// Same lock a single toggle respects: renaming a mounted pak can crash the game.
+/// With Galacta Mode on and Galacta installed (`galacta_mod_path`, known to the
+/// frontend), only the mods the game has loaded block the switch.
+/// `files` are the mods to rename, as they are on disk now.
+fn ensure_switch_allowed(
+    state: &Arc<Mutex<AppState>>,
+    galacta_mod_path: Option<&str>,
+    files: &[&Path],
+) -> Result<(), String> {
+    let (bypass, galacta_mode) = {
+        let s = state.lock().unwrap();
+        (s.bypass_game_running_lock, s.galacta_mode)
+    };
+    if bypass || !is_game_process_running() {
+        return Ok(());
+    }
+    let galacta_key = galacta_mod_path
+        .filter(|_| galacta_mode)
+        .and_then(galacta_mod_key);
+    let Some(galacta_key) = galacta_key else {
+        return Err("Close Marvel Rivals before switching profiles".to_string());
+    };
+    let galacta = read_galacta_mod_state();
+    let locked: Vec<String> = files
+        .iter()
+        .filter(|f| galacta_mod_locked(f, &galacta_key, &galacta))
+        .map(|f| f.file_name().unwrap_or_default().to_string_lossy().to_string())
+        .collect();
+    if locked.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "The game has {} of these mod(s) loaded: {}. Unload them with Galacta's Mod Toggle Key or close the game.",
+        locked.len(),
+        locked.join(", ")
+    ))
+}
+
+/// Renames one mod for a profile switch. Safe to repeat after a crash: a rename
+/// that already happened is detected and counted as done.
+fn apply_switch_rename(from: &Path, to: &Path) -> Result<(), String> {
+    if !from.exists() && to.exists() {
+        return Ok(());
+    }
+    if to.exists() {
+        return Err(format!("{} already exists", to.display()));
+    }
+    std::fs::rename(from, to).map_err(|e| format!("{}: {}", from.display(), e))
+}
+
+/// Runs the journaled switch forward, or undoes the renames already done.
+/// The watcher is muted for the batch and the list refreshes once at the end.
+fn run_profile_switch(
+    rollback: bool,
+    window: &Window,
+    watcher_state: &WatcherState,
+) -> Result<usize, String> {
+    let ops = mod_db::db().pending_switch().map_err(|e| e.to_string())?;
+    let Some(profile_id) = ops.first().map(|op| op.profile_id.clone()) else {
+        return Ok(0);
+    };
+
+    let was_paused = watcher_state.paused.swap(true, Ordering::Relaxed);
+    let mut changed = 0;
+    let mut result = Ok(());
+    if rollback {
+        for op in ops.iter().rev().filter(|op| op.done) {
+            result = apply_switch_rename(&op.to, &op.from);
+            if result.is_err() {
+                break;
+            }
+            let _ = mod_db::db().mark_switch_op(op.seq, false);
+            changed += 1;
+        }
+    } else {
+        for op in ops.iter().filter(|op| !op.done) {
+            result = apply_switch_rename(&op.from, &op.to);
+            if result.is_err() {
+                break;
+            }
+            let _ = mod_db::db().mark_switch_op(op.seq, true);
+            changed += 1;
+        }
+    }
+    watcher_state.paused.store(was_paused, Ordering::Relaxed);
+    let _ = window.emit("mods_dir_changed", ());
+
+    match result {
+        Ok(()) => {
+            let activate = (!rollback).then_some(profile_id.as_str());
+            mod_db::db()
+                .finish_switch(activate)
+                .map_err(|e| e.to_string())?;
+            Ok(changed)
+        }
+        Err(e) => {
+            let msg = format!(
+                "Profile switch stopped after {} of {} mod(s): {}",
+                changed,
+                ops.len(),
+                e
+            );
+            ui_log::error("Profiles", &msg);
+            Err(msg)
+        }
+    }
+}
+
+/// Applies a profile: only mods whose state differs are renamed, mods the
+/// profile has never seen are left alone. Returns how many mods changed.
+#[tauri::command]
+async fn switch_profile(
+    id: String,
+    galacta_mod_path: Option<String>,
+    window: Window,
+    state: State<'_, Arc<Mutex<AppState>>>,
+    watcher_state: State<'_, WatcherState>,
+) -> Result<usize, String> {
+    if !mod_db::db()
+        .pending_switch()
+        .map_err(|e| e.to_string())?
+        .is_empty()
+    {
+        return Err("Resume or roll back the interrupted profile switch first".to_string());
+    }
+    let total = mod_db::db().begin_switch(&id).map_err(|e| e.to_string())?;
+    if total == 0 {
+        mod_db::db()
+            .finish_switch(Some(&id))
+            .map_err(|e| e.to_string())?;
+        return Ok(0);
+    }
+    let ops = mod_db::db().pending_switch().map_err(|e| e.to_string())?;
+    let files: Vec<&Path> = ops.iter().map(|op| op.from.as_path()).collect();
+    if let Err(e) = ensure_switch_allowed(&state, galacta_mod_path.as_deref(), &files) {
+        // Nothing was renamed: drop the journal so no "interrupted" prompt shows
+        let _ = mod_db::db().finish_switch(None);
+        return Err(e);
+    }
+    let changed = run_profile_switch(false, &window, &watcher_state)?;
+    ui_log::success(
+        "Profiles",
+        format!("Switched profile: {} mod(s) enabled/disabled", changed),
+    );
+    Ok(changed)
+}
+
+/// Finishes (`rollback: false`) or undoes (`rollback: true`) an interrupted switch.
+#[tauri::command]
+async fn finish_interrupted_switch(
+    rollback: bool,
+    galacta_mod_path: Option<String>,
+    window: Window,
+    state: State<'_, Arc<Mutex<AppState>>>,
+    watcher_state: State<'_, WatcherState>,
+) -> Result<usize, String> {
+    let ops = mod_db::db().pending_switch().map_err(|e| e.to_string())?;
+    // Each mod still to rename, under the name it has on disk right now
+    let files: Vec<&Path> = ops
+        .iter()
+        .filter(|op| op.done == rollback)
+        .map(|op| if op.done { op.to.as_path() } else { op.from.as_path() })
+        .collect();
+    ensure_switch_allowed(&state, galacta_mod_path.as_deref(), &files)?;
+    let changed = run_profile_switch(rollback, &window, &watcher_state)?;
+    let verb = if rollback { "Rolled back" } else { "Resumed" };
+    ui_log::success(
+        "Profiles",
+        format!("{} the interrupted switch: {} mod(s)", verb, changed),
+    );
+    Ok(changed)
+}
+
 #[tauri::command]
 async fn check_game_running() -> Result<bool, String> {
     Ok(is_game_process_running())
@@ -5391,11 +5697,15 @@ fn parse_galacta_mod_state(text: &str) -> Option<(bool, Vec<String>)> {
 
 #[tauri::command]
 async fn get_galacta_mod_state() -> Result<GalactaModState, String> {
+    Ok(read_galacta_mod_state())
+}
+
+fn read_galacta_mod_state() -> GalactaModState {
     let Some(game_start) = game_process_start_time() else {
-        return Ok(GalactaModState::NotRunning);
+        return GalactaModState::NotRunning;
     };
     let Some(path) = galacta_saved_dir().map(|d| d.join(GALACTA_STATE_FILE)) else {
-        return Ok(GalactaModState::NoInfo);
+        return GalactaModState::NoInfo;
     };
     // A file older than the game process is left over from an earlier session.
     let fresh = std::fs::metadata(&path)
@@ -5404,12 +5714,30 @@ async fn get_galacta_mod_state() -> Result<GalactaModState, String> {
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
         .is_some_and(|t| t.as_secs() >= game_start);
     if !fresh {
-        return Ok(GalactaModState::NoInfo);
+        return GalactaModState::NoInfo;
     }
-    Ok(std::fs::read(&path)
+    std::fs::read(&path)
         .ok()
         .and_then(|bytes| parse_galacta_mod_state(&decode_ue_text(&bytes)))
-        .map_or(GalactaModState::NoInfo, |(mounted, keys)| GalactaModState::Live { mounted, keys }))
+        .map_or(GalactaModState::NoInfo, |(mounted, keys)| GalactaModState::Live { mounted, keys })
+}
+
+/// Whether the game may have the mod whose file is `current` loaded, under Galacta
+/// Mode. Same rule as `isModLocked` in App.tsx.
+fn galacta_mod_locked(current: &Path, galacta_key: &str, galacta: &GalactaModState) -> bool {
+    let key = galacta_mod_key(&current.to_string_lossy());
+    // Galacta itself is never unmounted by the Mod Toggle Key
+    if key.as_deref() == Some(galacta_key) {
+        return true;
+    }
+    match galacta {
+        GalactaModState::NotRunning => false,
+        // Before Galacta's login pass the game has mounted every enabled (.pak) mod
+        GalactaModState::NoInfo => current.extension().and_then(|e| e.to_str()) == Some("pak"),
+        GalactaModState::Live { mounted, keys } => {
+            *mounted && key.is_some_and(|k| keys.contains(&k))
+        }
+    }
 }
 
 /// Key name from `Galacta_ModToggleKey.galacta` (`<option index>|<key name>`, e.g. `5|L`).
@@ -5501,6 +5829,26 @@ fn game_process_start_time() -> Option<u64> {
 #[cfg(test)]
 mod galacta_mode_tests {
     use super::*;
+
+    #[test]
+    fn switch_lock_follows_galacta_state() {
+        let galacta = "projectgalacta_p";
+        let on = Path::new("C:/g/~mods/Skins/A_P.pak");
+        let off = Path::new("C:/g/~mods/Skins/B_P.bak_repak");
+        let own = Path::new("C:/g/~mods/ProjectGalacta_P.pak");
+        let live = |mounted, keys: &[&str]| GalactaModState::Live {
+            mounted,
+            keys: keys.iter().map(|k| k.to_string()).collect(),
+        };
+
+        assert!(galacta_mod_locked(own, galacta, &live(false, &[])));
+        // Waiting for the login pass: every enabled mod is natively mounted
+        assert!(galacta_mod_locked(on, galacta, &GalactaModState::NoInfo));
+        assert!(!galacta_mod_locked(off, galacta, &GalactaModState::NoInfo));
+        assert!(galacta_mod_locked(on, galacta, &live(true, &["skins/a_p"])));
+        assert!(!galacta_mod_locked(on, galacta, &live(true, &["skins/b_p"])));
+        assert!(!galacta_mod_locked(on, galacta, &live(false, &[])));
+    }
 
     #[test]
     fn parses_state_file() {
@@ -8336,10 +8684,10 @@ struct SingleModConflict {
 /// The same mod installed more than once (a copy under another name or folder).
 /// Groups of mod paths, each with the copy to keep first: an enabled one if any.
 ///
-/// Byte sizes of the .pak/.utoc/.ucas must match exactly, and only those
-/// candidates get their file lists read to confirm, so this costs one stat per
-/// mod plus a list read per likely duplicate. Two different mods with identical
-/// sizes and identical file lists are not realistic.
+/// Candidates come from mods.db: mods with the same content id (same file list).
+/// Byte sizes of the .pak/.utoc/.ucas must then match exactly too, because two
+/// recolors of one skin can share file list and uncompressed sizes. Only mods
+/// whose content id is not known yet get their file list read.
 #[tauri::command]
 async fn find_duplicate_mods(
     state: State<'_, Arc<Mutex<AppState>>>,
@@ -8352,58 +8700,30 @@ async fn find_duplicate_mods(
     }
     let size = |p: &Path| std::fs::metadata(p).map(|m| m.len()).ok();
 
-    let mut by_size: HashMap<(u64, Option<u64>, Option<u64>), Vec<PathBuf>> = HashMap::new();
-    for entry in WalkDir::new(&game_path).into_iter().filter_map(|e| e.ok()) {
-        let path = entry.path();
-        let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
-        if !path.is_file() || (ext != "pak" && ext != "bak_repak") {
-            continue;
-        }
-        // Companions are named after the .pak even while the mod is off
-        let base = path.with_extension("pak");
-        let Some(pak_size) = size(path) else { continue };
-        let key = (pak_size, size(&base.with_extension("utoc")), size(&base.with_extension("ucas")));
-        by_size.entry(key).or_default().push(path.to_path_buf());
-    }
-
-    let file_list = |path: &Path| -> Option<Vec<String>> {
-        let utoc = path.with_extension("pak").with_extension("utoc");
-        let files: Vec<String> = if utoc.exists() {
-            crate::utoc_utils::read_utoc(&utoc)
-                .iter()
-                .map(|e| e.file_path.clone())
-                .collect()
-        } else {
-            uasset_toolkit::list_pak_files(
-                path.to_str().unwrap_or_default(),
-                Some(crate::install_mod::AES_KEY_HEX),
-            )
-            .ok()?
-        };
-        let mut files: Vec<String> = files
-            .iter()
-            .map(|f| asset_explorer::normalize_asset_path(f).to_lowercase())
-            .collect();
-        files.sort();
-        Some(files)
-    };
-
     let mut groups = Vec::new();
-    for (_, candidates) in by_size.into_iter().filter(|(_, v)| v.len() > 1) {
-        let mut by_files: HashMap<Vec<String>, Vec<PathBuf>> = HashMap::new();
+    for candidates in mod_db::same_content_groups(&game_path) {
+        let mut by_size: HashMap<(u64, Option<u64>, Option<u64>), Vec<PathBuf>> = HashMap::new();
         for p in candidates {
-            // An empty or unreadable list proves nothing: never call those duplicates
-            if let Some(files) = file_list(&p).filter(|f| !f.is_empty()) {
-                by_files.entry(files).or_default().push(p);
-            }
+            // A row can point at a file removed since the last scan
+            let Some(pak_size) = size(&p) else { continue };
+            let key = (
+                pak_size,
+                size(&p.with_extension("utoc")),
+                size(&p.with_extension("ucas")),
+            );
+            by_size.entry(key).or_default().push(p);
         }
-        for (_, mut same) in by_files.into_iter().filter(|(_, v)| v.len() > 1) {
+        for (_, mut same) in by_size.into_iter().filter(|(_, v)| v.len() > 1) {
             // Keep an enabled copy, then the shortest path (usually the original)
             same.sort_by_key(|p| {
-                let off = p.extension().and_then(|e| e.to_str()) == Some("bak_repak");
+                let off = p.extension().and_then(|e| e.to_str()) != Some("pak");
                 (off, p.as_os_str().len())
             });
-            groups.push(same.iter().map(|p| p.to_string_lossy().to_string()).collect());
+            groups.push(
+                same.iter()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .collect(),
+            );
         }
     }
     Ok(groups)
@@ -9394,6 +9714,14 @@ fn main() {
                 }
             }
 
+            // Before the frontend lists mods, so the first scan already sees the new names
+            let mods_dir = app
+                .state::<Arc<Mutex<AppState>>>()
+                .lock()
+                .map(|s| s.game_path.clone())
+                .unwrap_or_default();
+            replace_spaces_in_mod_names(&mods_dir);
+
             let trash_days = app
                 .state::<Arc<Mutex<AppState>>>()
                 .lock()
@@ -9539,6 +9867,15 @@ fn main() {
             set_mod_priority,
             check_mod_clashes,
             find_duplicate_mods,
+            get_profiles,
+            create_profile,
+            save_profile,
+            rename_profile,
+            delete_profile,
+            get_profile_unknown_mods,
+            adopt_profile_unknown_mods,
+            switch_profile,
+            finish_interrupted_switch,
             get_asset_explorer_index,
             check_single_mod_conflicts,
             extract_pak_to_destination,

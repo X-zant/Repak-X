@@ -264,6 +264,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 pub fn normalize_mod_base_name(name: &str, min_nines: usize) -> String {
     let (has_bang, clean_base, nines) = split_mod_name(name);
     let nines = nines.unwrap_or(0).max(min_nines);
+    let clean_base = clean_base.replace(char::is_whitespace, "_");
 
     format!(
         "{}{}_{}_P",
@@ -632,6 +633,14 @@ mod tests {
         assert_eq!(
             normalize_mod_base_name("Mod_129", BASE_MOD_NINES),
             "Mod_129_9999999_P"
+        );
+    }
+
+    #[test]
+    fn normalize_replaces_whitespace_with_underscores() {
+        assert_eq!(
+            normalize_mod_base_name("Cool Mod v2", BASE_MOD_NINES),
+            "Cool_Mod_v2_9999999_P"
         );
     }
 

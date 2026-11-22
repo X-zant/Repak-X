@@ -82,6 +82,7 @@ import HeroFilterDropdown from './components/HeroFilterDropdown'
 import CustomDropdown from './components/CustomDropdown'
 import ShortcutsHelpModal from './components/ShortcutsHelpModal'
 import AddModSplitButton from './components/AddModSplitButton'
+import ProfilePicker from './components/ProfilePicker'
 import OnboardingTour from './components/OnboardingTour'
 
 // Utility functions
@@ -786,7 +787,7 @@ function App() {
             if (gameRunningRef.current) {
               alert.warning(
                 'Game Running',
-                'Mods installed, but changes will only take effect after restarting the game.',
+                installedWhileRunningMessage(),
                 { duration: 8000 }
               )
             }
@@ -2895,7 +2896,7 @@ function App() {
           if (gameRunning) {
             alert.warning(
               'Game Running',
-              'Mods installed, but changes will only take effect after restarting the game.',
+              installedWhileRunningMessage(),
               { duration: 8000 }
             )
           }
@@ -2963,7 +2964,7 @@ function App() {
           if (gameRunning) {
             alert.warning(
               'Game Running',
-              'Mods installed, but changes will only take effect after restarting the game.',
+              installedWhileRunningMessage(),
               { duration: 8000 }
             )
           }
@@ -3137,6 +3138,12 @@ function App() {
     }
     return { free, locked }
   }
+  // Galacta mounts new mods on its login pass or a Mod Toggle Key remount, so no restart is needed
+  const installedWhileRunningMessage = () => galactaWaiting
+    ? 'Mods installed. They will be loaded when Project Galacta loads mods at login.'
+    : galactaLive
+      ? `Mods installed, but changes will only take effect after remounting mods with ${toggleKeyText}.`
+      : 'Mods installed, but changes will only take effect after restarting the game.'
   const lockMessage = (action: string) => galactaWaiting
     ? `Cannot ${action} an enabled mod before Project Galacta loads mods at login. Disabled mods can be changed.`
     : galactaLive
@@ -3550,7 +3557,7 @@ function App() {
         if (gameRunning) {
           alert.warning(
             'Game Running',
-            'Mods installed, but changes will only take effect after restarting the game.',
+            installedWhileRunningMessage(),
             { duration: 8000 }
           )
         }
@@ -4195,7 +4202,7 @@ function App() {
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Search installed mods..."
+              placeholder="Search mods..."
               value={localSearch}
               onChange={handleSearchChange}
               className="main-search-input"
@@ -4217,6 +4224,7 @@ function App() {
           </div>
 
           <div className="action-controls">
+            <ProfilePicker mods={mods} onSwitched={loadMods} galactaModPath={galactaMode && projectGalactaMod ? projectGalactaMod.path : null} />
             <CustomDropdown
               options={[
                 { value: 'name_asc', label: 'Name (A-Z)' },
@@ -4484,7 +4492,8 @@ function App() {
                     className={`btn-ghost ${!isRightPanelOpen ? 'active' : ''}`}
                     title={isRightPanelOpen ? "Collapse Details" : "Expand Details"}
                   >
-                    <ViewSidebarIcon fontSize="small" style={{ transform: isRightPanelOpen ? 'none' : 'rotate(180deg)' }} />
+                    <ViewSidebarIcon style={{ color: 'var(--accent-primary)', width: '18px', height: '18px', transform: isRightPanelOpen ? 'none' : 'rotate(180deg)' }} />
+                    <span className="btn-label">Details</span>
                   </button>
                   <div className="divider-vertical" />
                   <button onClick={loadMods} className="btn-ghost" title="Refresh list">

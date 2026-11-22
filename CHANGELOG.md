@@ -2,6 +2,12 @@
 
 ## [2.4.0](https://github.com/X-zant/Repak-X/releases/latest)
 
+### 🗃️ Mods Database
+- Added a local mods database: tags now follow a mod through toggles, renames, moves, updates and restores, and same-named mods in different folders no longer share them.
+- Added Profiles: save which mods are enabled as a named profile and switch between them from the action bar. Switches only change the mods that differ and ask about new mods. Double-click to rename.
+- Mods renamed or moved outside Repak X are recognized again on the next scan.
+- Mod details are now cached between launches, allowing for faster startup.
+
 ### 🔧 Backend / Logic
 - Added Galacta Mode: only the mods the game has loaded stay locked while it runs. (Requires Project Galacta v1.6.0, can be toggled in Settings)
 - Deleted mods now go to Recently deleted and can be restored for a set number of days. (Can be toggled in Settings)

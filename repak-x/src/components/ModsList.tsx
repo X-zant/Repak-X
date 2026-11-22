@@ -462,7 +462,7 @@ const ModItem = memo(function ModItem({
                     {/* Type badge at start for card views */}
                     {showModType && category && isCardView && (
                         <span className={`mod-type-badge category-badge ${category.toLowerCase().replace(/\s+/g, '-')}-badge`}>
-                            {category}
+                            {category === 'Unknown' ? 'Other' : category}
                         </span>
                     )}
                     {visibleTags.map(tag => (
@@ -511,7 +511,7 @@ const ModItem = memo(function ModItem({
                     {/* Type badge at end for list view */}
                     {showModType && category && !isCardView && (
                         <span className={`mod-type-badge category-badge ${category.toLowerCase().replace(/\s+/g, '-')}-badge`}>
-                            {category}
+                            {category === 'Unknown' ? 'Other' : category}
                         </span>
                     )}
                 </div>

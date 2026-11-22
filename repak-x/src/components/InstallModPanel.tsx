@@ -418,7 +418,7 @@ export default function InstallModPanel({ mods, allTags, folders = [], currentFo
                               type="text"
                               placeholder="Insert custom name here"
                               value={modSettings[idx]?.customName || ''}
-                              onChange={(e) => updateModSetting(idx, 'customName', e.target.value)}
+                              onChange={(e) => updateModSetting(idx, 'customName', e.target.value.replace(/\s/g, '_'))}
                               className="mod-name-input"
                             />
                             <span className="mod-name-suffix-hint">_9999999_P</span>
@@ -426,7 +426,7 @@ export default function InstallModPanel({ mods, allTags, folders = [], currentFo
                           <span className="install-mod-card__hint" title={mod.path}>
                             {modSettings[idx]?.customName
                               ? `${modSettings[idx].customName}_9999999_P.pak`
-                              : mod.mod_name}
+                              : mod.mod_name?.replace(/\s/g, '_')}
                           </span>
                         </div>
                         <span className={`install-mod-card__pill ${mod.is_dir ? 'pill-folder' : 'pill-pak'}`}>

@@ -19,6 +19,8 @@ type InputPromptModalProps = {
     description?: string;
     /** 'choice' mode: one button per option, clicking it confirms with its value */
     options?: { value: string; label: React.ReactNode; detail?: string }[];
+    /** 'choice' mode: extra content between the description and the options */
+    children?: React.ReactNode;
 };
 
 /**
@@ -48,6 +50,7 @@ const InputPromptModal = ({
     initialValue = '',
     accentColor = '',
     mode = 'input',
+    children,
     description = '',
     options = []
 }: InputPromptModalProps) => {
@@ -127,6 +130,7 @@ const InputPromptModal = ({
                             {mode === 'choice' ? (
                                 <>
                                     {description && <p className="prompt-description">{description}</p>}
+                                    {children}
                                     {options.map(o => (
                                         <button key={o.value} type="button" className="prompt-option" onClick={() => onConfirm(o.value)}>
                                             <span className="prompt-option-label">{o.label}</span>

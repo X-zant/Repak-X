@@ -53,6 +53,69 @@
     min-width: 0;
 }
 
+/* In-place rename of an option (double-click), styled like the mod card rename */
+.custom-dropdown-rename-input {
+    flex: 1;
+    min-width: 0;
+    padding: 2px 6px;
+    font-size: var(--fs-base);
+    font-weight: 600;
+    color: var(--text-primary);
+    background: var(--bg-dark);
+    border: 1px solid var(--accent-primary);
+    border-radius: 4px;
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary), transparent 80%), inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.custom-dropdown-rename-input::selection {
+    background: var(--accent-primary);
+    color: var(--on-accent);
+}
+
+.custom-dropdown-item.editing,
+.custom-dropdown-item.editing:hover {
+    background: transparent;
+    cursor: default;
+}
+
+/* Side-by-side commands under the options (e.g. Save | Revert) */
+.custom-dropdown-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.custom-dropdown-action {
+    flex: 1;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: var(--fs-base);
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.custom-dropdown-action svg {
+    color: var(--accent-primary);
+    font-size: var(--fs-lg);
+    flex-shrink: 0;
+}
+
+.custom-dropdown-action:hover {
+    background: var(--tag-hover-bg);
+}
+
+/* Keep a suffix (e.g. an unsaved marker) right after the label, not at the far edge */
+.custom-dropdown-text.has-suffix {
+    flex: 0 1 auto;
+}
+
 .custom-dropdown-trigger:hover {
     background-color: var(--bg-hover, rgba(255, 255, 255, 0.05));
     border-color: var(--border-light, rgba(255, 255, 255, 0.2));
@@ -174,6 +237,13 @@
 .custom-dropdown-item.add-new {
     color: var(--accent-primary);
     font-weight: 500;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.custom-dropdown-item.add-new svg {
+    font-size: var(--fs-lg);
+    flex-shrink: 0;
 }
 
 .custom-dropdown-item.disabled {
