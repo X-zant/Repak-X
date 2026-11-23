@@ -7,8 +7,7 @@ import { FaTag } from "react-icons/fa6"
 import { VscFolder, VscFolderOpened, VscChevronRight, VscChevronDown, VscNewFolder } from 'react-icons/vsc'
 import { MdCreateNewFolder } from 'react-icons/md'
 import './InstallModPanel.css'
-import characterData from '../data/character_data.json'
-import { resolveHeroImage, useHeroImages } from '../utils/heroImages'
+import { resolveHeroImage, useHeroImages, type CharacterDataEntry } from '../utils/heroImages'
 import { useDialog } from '../hooks/useDialog'
 
 type FolderRecord = {
@@ -54,6 +53,8 @@ type InstallModPanelProps = {
   onNewTag: (callback: (tag: string) => void) => void
   onNewFolder: (callback: (name: string) => void) => void
   onMergeHybrid?: (path1: string, path2: string) => void
+  /** Live character database (App state), not the bundled JSON */
+  characterData: CharacterDataEntry[]
 }
 
 
@@ -219,7 +220,7 @@ function parseModType(modType: string | undefined): { character: string | null; 
   return { character, category, additional }
 }
 
-export default function InstallModPanel({ mods, allTags, folders = [], currentFolderId, onCreateTag, onDeleteTag, onCreateFolder, onInstall, onCancel, onNewTag, onNewFolder, onMergeHybrid }: InstallModPanelProps) {
+export default function InstallModPanel({ mods, allTags, folders = [], currentFolderId, onCreateTag, onDeleteTag, onCreateFolder, onInstall, onCancel, onNewTag, onNewFolder, onMergeHybrid, characterData }: InstallModPanelProps) {
   const dialog = useDialog(onCancel, 'Install mods')
   // Repaint when the synced hero portraits finish loading.
   useHeroImages()
@@ -437,7 +438,7 @@ export default function InstallModPanel({ mods, allTags, folders = [], currentFo
                       <div className="install-mod-card__badges">
                         {character && (
                           <span className={`character-badge ${character.startsWith('Multiple Heroes') ? 'multi-hero' : ''}`}>
-                            {getHeroImage(character) && <img src={getHeroImage(character)} alt="" />}
+                            {resolveHeroImage(character, characterData) && <img src={resolveHeroImage(character, characterData)} alt="" />}
                             {character}
                           </span>
                         )}
@@ -681,9 +682,4 @@ export default function InstallModPanel({ mods, allTags, folders = [], currentFo
       </motion.div>
     </div>
   )
-}
-
-// Portraits come from the synced cache (see utils/heroImages).
-function getHeroImage(heroName?: string | null): string | undefined {
-  return resolveHeroImage(heroName, characterData)
 }

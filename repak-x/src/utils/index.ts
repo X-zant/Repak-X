@@ -4,6 +4,6 @@
  */
 
 export { toTagArray } from './tags';
-export { detectHeroes, detectHeroesWithData } from './heroes';
+export { detectHeroesWithData } from './heroes';
 export { formatFileSize, normalizeModBaseName } from './format';
 export { getAdditionalCategories } from './mods';

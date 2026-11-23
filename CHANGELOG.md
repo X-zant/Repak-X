@@ -14,6 +14,7 @@
 - Check Conflicts now detects mod duplicates.
 - Improved game path detection and added support for Loading Bay launcher.
 - When multiple game installations are found, you can now pick which one to use, with a recommended pick.
+- The heroes database now updates from psylocke.gg.
 - Mod operations bug fixes.
 
 ### 🎨 Frontend / UI

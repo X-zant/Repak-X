@@ -484,7 +484,7 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
                           </div>
                           <div className="trash-footer">
                             <span className="trash-meta">
-                              {trashEntries.length} item{trashEntries.length === 1 ? '' : 's'}
+                              {trashEntries.length} item{trashEntries.length === 1 ? '' : 's'} · {formatFileSize(trashEntries.reduce((sum, t) => sum + t.size, 0))}
                             </span>
                             <button className="trash-btn danger" onClick={() => purgeTrash()}>
                               Empty archive
@@ -523,7 +523,7 @@ export default function SettingsPanel({ settings, onSave, onClose, theme, setThe
                       ))}
                       <button
                         className={`color-option mono ${accentColor === '#ffffff' || accentColor === '#000000' ? 'selected' : ''}`}
-                        style={{ background: 'linear-gradient(135deg, #ffffff 50%, #000000 50%)' }}
+                        style={{ background: 'linear-gradient(135deg, #ffffff 50%, #000000 50%) border-box' }}
                         onClick={() => setAccentColor(theme === 'light' ? '#000000' : '#ffffff')}
                         title="Monochrome"
                       />

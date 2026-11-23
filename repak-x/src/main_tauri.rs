@@ -3821,9 +3821,9 @@ async fn update_mod(
     // Step 4: Apply preserved metadata to the new mod
     // ========================================================================
 
-    // Determine the new mod's path
-    let new_mod_filename = format!("{}_9999999_P.pak", mod_name);
-    let new_mod_path = if install_subfolder.is_empty() {
+    // The installer normalized the name in place (priority suffix), so that is the real filename
+    let new_mod_filename = format!("{}.pak", installable_mods[0].mod_name);
+    let mut new_mod_path = if install_subfolder.is_empty() {
         mod_directory.join(&new_mod_filename)
     } else {
         mod_directory
@@ -3831,24 +3831,22 @@ async fn update_mod(
             .join(&new_mod_filename)
     };
 
-    // The new version keeps the old one's uid, so its tags carry over
-    if let Err(e) = mod_db::db().moved(&actual_old_path, &new_mod_path) {
-        error!("Moving the updated mod in mods.db failed: {}", e);
-    }
-
-    info!("Expected new mod path: {:?}", new_mod_path);
+    info!("New mod path: {:?}", new_mod_path);
 
     // If the old mod was disabled, disable the new one too
     if was_disabled && new_mod_path.exists() {
-        let disabled_path = PathBuf::from(format!(
-            "{}.bak_repak",
-            new_mod_path.to_string_lossy().trim_end_matches(".pak")
-        ));
+        let disabled_path = new_mod_path.with_extension("bak_repak");
         if let Err(e) = std::fs::rename(&new_mod_path, &disabled_path) {
             warn!("Failed to disable new mod to match old state: {}", e);
         } else {
             info!("Disabled new mod to match old mod's state");
+            new_mod_path = disabled_path;
         }
+    }
+
+    // The new version keeps the old one's uid, so its tags carry over
+    if let Err(e) = mod_db::db().moved(&actual_old_path, &new_mod_path) {
+        error!("Moving the updated mod in mods.db failed: {}", e);
     }
 
     // Metadata updates removed (deprecated)
@@ -8003,11 +8001,11 @@ async fn refresh_character_cache() -> Result<String, String> {
     Ok("Character data cache refreshed successfully".to_string())
 }
 
-/// Update character data from GitHub MarvelRivalsCharacterIDs with progress events
-/// Supports cancellation via cancel_character_update command
+/// Update character data from the Starsong API with progress events
+/// (command name kept for the frontend). Supports cancellation via cancel_character_update
 #[tauri::command]
 async fn update_character_data_from_github(window: Window) -> Result<usize, String> {
-    ui_log::info("CharDB", "Manual update requested - fetching from GitHub...");
+    ui_log::info("CharDB", "Manual update requested - fetching from Psylocke.gg...");
 
     let on_progress = move |msg: &str| {
         // Step-by-step chatter is debug: useful when a fetch stalls, noise when
@@ -8015,7 +8013,7 @@ async fn update_character_data_from_github(window: Window) -> Result<usize, Stri
         ui_log::debug("CharDB", msg);
     };
 
-    match character_data::update_from_github_with_progress(on_progress).await {
+    match character_data::update_character_data_with_progress(on_progress).await {
         Ok(new_count) => {
             ui_log::success(
                 "CharDB",
@@ -8328,6 +8326,11 @@ fn compute_mod_details(path: &PathBuf) -> Result<ModDetails, String> {
     }
 
     // --- Cache check (persisted in mods.db, survives restarts and toggles) ---
+    if character_data::take_details_stale() {
+        if let Err(e) = mod_db::db().clear_details() {
+            warn!("Failed to clear cached mod details: {}", e);
+        }
+    }
     let stamp = mod_db::stamp(&path);
     let cached = mod_db::db().cached_details(&stamp);
     if let Some(mut details) = cached.and_then(|j| serde_json::from_str::<ModDetails>(&j).ok()) {

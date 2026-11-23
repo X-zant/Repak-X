@@ -87,7 +87,7 @@ import OnboardingTour from './components/OnboardingTour'
 
 // Utility functions
 import { toTagArray } from './utils/tags'
-import { detectHeroes, PROJECT_GALACTA_HERO_ID } from './utils/heroes'
+import { detectHeroesWithData, PROJECT_GALACTA_HERO_ID } from './utils/heroes'
 import { formatFileSize, normalizeModBaseName } from './utils/format'
 import { countModsInPaths, getAdditionalCategories } from './utils/mods'
 import { monoAccent, isMonoAccent, MONO_AURORA_PALETTES, applyOnAccent } from './utils/accent'
@@ -1413,7 +1413,7 @@ function App() {
       setModLoadingProgress(-1)
       setIsModsLoading(true)
 
-      const result = await invoke('update_mod', {
+      const result = await invoke<{ new_mod_path: string }>('update_mod', {
         oldModPath: mod.path,
         newModSource: newSourcePath,
         preserveName: preserveName
@@ -1421,16 +1421,15 @@ function App() {
 
       console.log('Update result:', result)
 
-      // Refresh data
-      await loadMods()
+      // Refresh data (also refetches details for the replaced file)
+      const refreshed = await loadMods()
 
-      // If we're updating the currently selected mod, we might need to update selection if path changed
+      // Re-select the replaced mod (path may have changed) so the details panel reloads its content
       if (selectedMod && selectedMod.path === mod.path) {
-        // If path changed (preserveName=false), we should try to find the new mod
-        // But loadMods is async, so best effort is to deselect or just let user reselect
-        if (!preserveName) {
-          setSelectedMod(null)
-        }
+        // Backend joins the subfolder with '/', the mod list uses '\' - compare normalized
+        const norm = (p?: string) => (p ?? '').replace(/\//g, '\\').toLowerCase()
+        const fresh = refreshed?.find(m => norm(m.path) === norm(result?.new_mod_path))
+        setSelectedMod(fresh ?? null)
       }
 
       console.debug('[UpdateMod] Completed update flow; relying on backend named success toast')
@@ -2051,7 +2050,7 @@ function App() {
         hasMulti = true
         // Extract individual heroes from the mod's file list
         if (d.files && Array.isArray(d.files)) {
-          const heroes = detectHeroes(d.files)
+          const heroes = detectHeroesWithData(d.files, characterData)
           heroes.forEach(h => charSet.add(h))
         }
       }
@@ -3210,7 +3209,7 @@ function App() {
 
         let multiMatch = false
         if (isMulti && d.files) {
-          const heroes = detectHeroes(d.files)
+          const heroes = detectHeroesWithData(d.files, characterData)
           multiMatch = heroes.some(h => selectedCharacters.has(h))
         }
 
@@ -3839,6 +3838,7 @@ function App() {
           onNewTag={(callback) => setNewTagPrompt({ callback })}
           onNewFolder={(callback) => setNewFolderFromInstall({ callback })}
           onMergeHybrid={handleMergeHybrid}
+          characterData={characterData}
         />
       )}
 

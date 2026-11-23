@@ -367,7 +367,7 @@ export default function ToolsPanel({ onClose, onOpenAssetExplorer, projectGalact
             id: 'hero-database',
             icon: FaUsers,
             title: 'Heroes Database',
-            description: 'Update from GitHub to support new heroes and skins.',
+            description: 'Update from psylocke.gg to support new heroes and skins.',
             onClick: handleUpdateCharacterData,
             busy: isUpdatingChars,
             disabled: isUpdatingChars,
@@ -485,12 +485,12 @@ export default function ToolsPanel({ onClose, onOpenAssetExplorer, projectGalact
                         {/* Kept outside the cards: a link nested inside a <button> would be
                             invalid markup and its click would also fire the card. */}
                         <p className="tools-footnote">
-                            Heroes database maintained by{' '}
+                            Heroes database provided by{' '}
                             <span
                                 className="tools-footnote-link"
-                                onClick={() => open('https://github.com/donutman07/MarvelRivalsCharacterIDs')}
+                                onClick={() => open('https://psylocke.gg/')}
                             >
-                                donutman07
+                                psylocke.gg
                             </span>
                         </p>
                     </div>

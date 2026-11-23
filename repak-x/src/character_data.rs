@@ -1,6 +1,7 @@
 // Character Data Management
 // Handles external character_data.json in roaming folder with caching for performance
-// Fetches updates from GitHub MarvelRivalsCharacterIDs repository
+// Fetches updates from the Starsong GraphQL API (data.starsong.dev); the GitHub
+// MarvelRivalsCharacterIDs fetcher is kept below as an unused backup source
 
 use crate::ui_log;
 use log::{info, warn};
@@ -35,10 +36,29 @@ pub fn reset_cancel_flag() {
 }
 
 // ============================================================================
-// GITHUB DATA SOURCE
+// STARSONG DATA SOURCE
 // ============================================================================
 
-const GITHUB_CHARACTER_DATA_URL: &str = 
+const STARSONG_GRAPHQL_URL: &str = "https://data.starsong.dev/marvel-rivals/graphql";
+
+/// Starsong asked for an identifiable User-Agent so it can trace its traffic.
+const STARSONG_USER_AGENT: &str = concat!("RepakX/", env!("CARGO_PKG_VERSION"));
+
+/// Part of the saved revision key: bump it whenever STARSONG_SKINS_QUERY changes,
+/// otherwise an unchanged pin would skip fetching the new fields.
+const STARSONG_QUERY_VERSION: &str = "v2";
+
+/// Hero id Project Galacta mods are labelled with (see utils.rs / heroes.ts).
+const GALACTA_HERO_ID: &str = "4017";
+
+const STARSONG_SKINS_QUERY: &str = "{ revision { pin heroes(first: 100) { nodes { id name playable items(first: 100, type: [SKIN, SKIN_COLOR]) { nodes { id name } } } } } }";
+
+// ============================================================================
+// GITHUB DATA SOURCE (backup, currently unused)
+// ============================================================================
+
+#[allow(dead_code)]
+const GITHUB_CHARACTER_DATA_URL: &str =
     "https://raw.githubusercontent.com/donutman07/MarvelRivalsCharacterIDs/main/MarvelRivalsCharacterIDs.md";
 
 // ============================================================================
@@ -137,12 +157,17 @@ pub fn load_character_data() -> Vec<CharacterSkin> {
     if path.exists() {
         match fs::read_to_string(&path) {
             Ok(contents) => match serde_json::from_str::<Vec<CharacterSkin>>(&contents) {
-                Ok(skins) => {
+                Ok(mut skins) => {
                     info!(
                         "Loaded {} character skins from {}",
                         skins.len(),
                         path.display()
                     );
+                    if migrate_renamed_heroes(&mut skins) {
+                        // Persist so the rename runs once
+                        let _ = save_character_data(&skins);
+                        DETAILS_STALE.store(true, Ordering::SeqCst);
+                    }
                     return skins;
                 }
                 Err(e) => {
@@ -171,6 +196,38 @@ pub fn load_character_data() -> Vec<CharacterSkin> {
     Vec::new()
 }
 
+/// Set when loading renamed heroes in the saved data, so the cached mod details
+/// (which embed hero names) get cleared. Cleared lazily by `take_details_stale`
+/// rather than here, because loading can run while the mod database is locked.
+static DETAILS_STALE: AtomicBool = AtomicBool::new(false);
+
+/// Returns true once after renamed heroes were loaded.
+pub fn take_details_stale() -> bool {
+    ensure_cache_initialized();
+    DETAILS_STALE.swap(false, Ordering::SeqCst)
+}
+
+/// Rename heroes whose display name changed in saved data files (users keep their
+/// own copy in the config folder, so editing the bundled JSON alone doesn't reach them).
+/// Returns whether anything was renamed.
+fn migrate_renamed_heroes(skins: &mut [CharacterSkin]) -> bool {
+    let mut changed = false;
+    for skin in skins.iter_mut() {
+        let renamed = match skin.name.as_str() {
+            "Punisher" => "The Punisher",
+            "Iron Fist (lin Lie)" => "Iron Fist",
+            // Old local names -> the API's, until the first update rewrites the file
+            "Hulk" => "Bruce Banner",
+            "Jeff the Landshark" => "Jeff The Land Shark",
+            "Gorr" => "Gorr The God Butcher",
+            _ => continue,
+        };
+        skin.name = renamed.to_string();
+        changed = true;
+    }
+    changed
+}
+
 /// Save character data to external JSON file with backup and sorting
 pub fn save_character_data(skins: &[CharacterSkin]) -> Result<(), String> {
     let path = character_data_path();
@@ -180,14 +237,23 @@ pub fn save_character_data(skins: &[CharacterSkin]) -> Result<(), String> {
         fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
     }
 
-    // Backup existing file if it exists
+    // One backup, overwritten each save
     if path.exists() {
-        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-        let backup_path = path.with_file_name(format!("character_data_backup_{}.json", timestamp));
+        let backup_path = path.with_file_name("character_data_backup.json");
         if let Err(e) = fs::copy(&path, &backup_path) {
             warn!("Failed to create backup: {}", e);
         } else {
             info!("Created backup at {}", backup_path.display());
+        }
+    }
+    // Older versions wrote a timestamped backup on every save; remove those
+    if let Some(entries) = path.parent().and_then(|dir| fs::read_dir(dir).ok()) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name.starts_with("character_data_backup_") && name.ends_with(".json") {
+                let _ = fs::remove_file(entry.path());
+            }
         }
     }
 
@@ -339,7 +405,7 @@ fn normalize_character_name(raw_name: &str) -> String {
 
     // Special cases that need exact formatting
     match trimmed {
-        "the punisher" | "punisher" => "Punisher".to_string(),
+        "the punisher" | "punisher" => "The Punisher".to_string(),
         "the thing" => "The Thing".to_string(),
         "cloak and dagger" | "cloak & dagger" => "Cloak & Dagger".to_string(),
         "jeff the landshark" | "jeff the land shark" => "Jeff the Landshark".to_string(),
@@ -450,6 +516,7 @@ fn validate_skin(skin: &CharacterSkin) -> Result<(), String> {
 /// Parse GitHub Markdown file and extract character data
 /// Format: Markdown table with | ID | NAME | SKIN IDs | SKIN NAMES |
 /// Empty cells (| | |) mean "same as previous row"
+#[allow(dead_code)]
 fn parse_github_markdown(content: &str) -> Result<Vec<CharacterSkin>, String> {
     info!("=== Starting GitHub Markdown Parse ===");
     info!("Content length: {} bytes", content.len());
@@ -616,6 +683,7 @@ fn parse_github_markdown(content: &str) -> Result<Vec<CharacterSkin>, String> {
 }
 
 /// Fetch character data from GitHub with progress callback and cancellation support
+#[allow(dead_code)]
 pub async fn fetch_github_data_with_progress<F>(
     on_progress: &mut F,
 ) -> Result<Vec<CharacterSkin>, String>
@@ -689,9 +757,182 @@ where
     Ok(skins)
 }
 
-/// Update character data from GitHub with progress callback
+// ============================================================================
+// STARSONG DATA FETCHER
+// ============================================================================
+
+fn starsong_pin_path() -> PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("Repak-X")
+        .join("character_data_starsong_pin.txt")
+}
+
+/// Run a GraphQL query and return its `data`.
+/// Uses GET because the API only caches GET requests.
+async fn starsong_query(
+    client: &reqwest::Client,
+    query: &str,
+    at: Option<&str>,
+) -> Result<serde_json::Value, String> {
+    let mut request = client
+        .get(STARSONG_GRAPHQL_URL)
+        .header(reqwest::header::ACCEPT, "application/json")
+        .query(&[("query", query)]);
+    if let Some(pin) = at {
+        request = request.query(&[("at", pin)]);
+    }
+    let response = request
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach Psylocke.gg API: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Psylocke.gg API returned status: {}", response.status()));
+    }
+
+    let mut body: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to read Psylocke.gg response: {}", e))?;
+
+    if let Some(errors) = body.get("errors").and_then(|e| e.as_array()) {
+        if !errors.is_empty() {
+            return Err(format!("Psylocke.gg API error: {}", serde_json::Value::from(errors.clone())));
+        }
+    }
+
+    match body.get_mut("data") {
+        Some(data) if !data.is_null() => Ok(data.take()),
+        _ => Err("Psylocke.gg response had no data".to_string()),
+    }
+}
+
+/// Turn the heroes/items response into CharacterSkin rows, using the API's hero
+/// names (e.g. 1011 is "Bruce Banner").
+fn parse_starsong_heroes(data: &serde_json::Value) -> Result<Vec<CharacterSkin>, String> {
+    let heroes = data
+        .pointer("/revision/heroes/nodes")
+        .and_then(|n| n.as_array())
+        .ok_or("Psylocke.gg response is missing revision.heroes.nodes")?;
+
+    let mut skins = Vec::new();
+    for hero in heroes {
+        let (Some(char_id), Some(api_name)) = (
+            hero.get("id").and_then(|v| v.as_str()),
+            hero.get("name").and_then(|v| v.as_str()),
+        ) else {
+            continue;
+        };
+        let playable = hero.get("playable").and_then(|v| v.as_bool()).unwrap_or(false);
+
+        // Non-playable rows are NPCs and internal placeholders (some named in Chinese).
+        // Galacta is the exception: Project Galacta (WBP_Galacta) mods are labelled
+        // with its id, and the API calls it "Lobby Npc - Galacta".
+        let char_name = if char_id == GALACTA_HERO_ID {
+            "Galacta".to_string()
+        } else if !playable {
+            continue;
+        } else {
+            api_name.trim().to_string()
+        };
+
+        let items = hero
+            .pointer("/items/nodes")
+            .and_then(|n| n.as_array())
+            .map(|a| a.as_slice())
+            .unwrap_or(&[]);
+        for item in items {
+            let (Some(item_id), Some(item_name)) = (
+                item.get("id").and_then(|v| v.as_str()),
+                item.get("name").and_then(|v| v.as_str()),
+            ) else {
+                continue;
+            };
+            // SKIN_COLOR items are "ps" + the 7-digit skin id the paks use.
+            let skin_id = item_id.strip_prefix("ps").unwrap_or(item_id);
+            // The database names every base skin "Default"; the API repeats the hero name.
+            let skin_name = if skin_id.ends_with("001") {
+                "Default".to_string()
+            } else {
+                normalize_skin_name(item_name)
+            };
+
+            let skin = CharacterSkin {
+                name: char_name.clone(),
+                id: char_id.to_string(),
+                skinid: skin_id.to_string(),
+                skin_name,
+            };
+            match validate_skin(&skin) {
+                Ok(()) => skins.push(skin),
+                Err(e) => warn!("Skipping Psylocke.gg item {}: {}", item_id, e),
+            }
+        }
+    }
+
+    if skins.is_empty() {
+        return Err("No skins were parsed from Psylocke.gg data".to_string());
+    }
+    Ok(skins)
+}
+
+/// Fetch character data from the Starsong API with progress and cancellation.
+/// Returns Ok(None) when the revision matches `saved_key` (nothing changed);
+/// otherwise the new revision key (to save after a successful write) and the skins.
+async fn fetch_starsong_data_with_progress<F>(
+    on_progress: &mut F,
+    saved_key: Option<&str>,
+) -> Result<Option<(String, Vec<CharacterSkin>)>, String>
+where
+    F: FnMut(&str) + Send,
+{
+    reset_cancel_flag();
+
+    let client = reqwest::Client::builder()
+        .user_agent(STARSONG_USER_AGENT)
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    on_progress("Checking Psylocke.gg data revision...");
+    let data = starsong_query(&client, "{ revision { pin } }", None).await?;
+    let pin = data
+        .pointer("/revision/pin")
+        .and_then(|p| p.as_str())
+        .ok_or("Psylocke.gg response is missing revision.pin")?
+        .to_string();
+    let key = format!("{}:{}", STARSONG_QUERY_VERSION, pin);
+    info!("Psylocke.gg revision: {}", pin);
+
+    if saved_key == Some(key.as_str()) {
+        on_progress(&format!("Already on Psylocke.gg revision {}", pin));
+        return Ok(None);
+    }
+
+    if is_update_cancelled() {
+        on_progress("Update cancelled by user");
+        return Err("Cancelled".to_string());
+    }
+
+    on_progress(&format!("Downloading character data (revision {})...", pin));
+    // Pinned so this reads the exact revision checked above; pinned responses never change.
+    let data = starsong_query(&client, STARSONG_SKINS_QUERY, Some(&pin)).await?;
+
+    if is_update_cancelled() {
+        on_progress("Update cancelled by user");
+        return Err("Cancelled".to_string());
+    }
+
+    let skins = parse_starsong_heroes(&data)?;
+    on_progress(&format!("Fetched {} character skins", skins.len()));
+    info!("Fetched {} character skins from Psylocke.gg", skins.len());
+    Ok(Some((key, skins)))
+}
+
+/// Update character data from the Starsong API with progress callback
 /// (fetches, validates, saves, refreshes cache)
-pub async fn update_from_github_with_progress<F>(mut on_progress: F) -> Result<usize, String>
+pub async fn update_character_data_with_progress<F>(mut on_progress: F) -> Result<usize, String>
 where
     F: FnMut(&str) + Send,
 {
@@ -701,12 +942,13 @@ where
     let existing = if path.exists() {
         match fs::read_to_string(&path) {
             Ok(contents) => match serde_json::from_str::<Vec<CharacterSkin>>(&contents) {
-                Ok(skins) => {
+                Ok(mut skins) => {
                     info!(
                         "Loaded {} existing skins from {}",
                         skins.len(),
                         path.display()
                     );
+                    migrate_renamed_heroes(&mut skins);
                     skins
                 }
                 Err(e) => {
@@ -725,8 +967,19 @@ where
     };
     let existing_count = existing.len();
 
-    let new_skins = fetch_github_data_with_progress(&mut on_progress).await?;
-    info!("Fetched {} skins from GitHub", new_skins.len());
+    // Only trust the saved revision while the data file it produced still exists.
+    let saved_key = if path.exists() {
+        fs::read_to_string(starsong_pin_path())
+            .ok()
+            .map(|s| s.trim().to_string())
+    } else {
+        None
+    };
+    let Some((revision_key, new_skins)) =
+        fetch_starsong_data_with_progress(&mut on_progress, saved_key.as_deref()).await?
+    else {
+        return Ok(0);
+    };
 
     on_progress(&format!("Validating {} fetched skins...", new_skins.len()));
 
@@ -746,43 +999,40 @@ where
         );
     }
 
-    // Merge existing and new skins using a HashMap to deduplicate by skin ID
-    on_progress("Merging with existing data...");
-    use std::collections::HashMap;
-    let mut skin_map: HashMap<String, CharacterSkin> = HashMap::new();
-
-    // First, add all existing skins
-    for skin in existing {
-        skin_map.insert(skin.skinid.clone(), skin);
+    // The API is the source of truth: the file is rewritten from it, not merged,
+    // so skins the API dropped (placeholders, unreleased heroes) go away too.
+    let existing_ids: std::collections::HashSet<&str> =
+        existing.iter().map(|s| s.skinid.as_str()).collect();
+    let new_count = new_skins
+        .iter()
+        .filter(|s| !existing_ids.contains(s.skinid.as_str()))
+        .count();
+    let total_count = new_skins.len();
+    // A rewrite replaces everything, so refuse an answer that lost most of the
+    // data (e.g. a schema change emptying a field) instead of wiping the database.
+    if total_count < existing_count / 2 {
+        return Err(format!(
+            "Psylocke.gg returned only {} skins (had {}), keeping existing data",
+            total_count, existing_count
+        ));
     }
 
-    // Then, add/update with GitHub skins (overwrites duplicates with fresh data)
-    for skin in new_skins {
-        skin_map.insert(skin.skinid.clone(), skin);
+    on_progress(&format!("Saving {} character skins to disk...", total_count));
+    save_character_data(&new_skins)?;
+    if let Err(e) = fs::write(starsong_pin_path(), &revision_key) {
+        warn!("Failed to save Psylocke.gg revision: {}", e);
     }
-
-    // Convert back to Vec
-    let merged_skins: Vec<CharacterSkin> = skin_map.into_values().collect();
-    let merged_count = merged_skins.len();
-
-    on_progress(&format!(
-        "Saving {} character skins to disk...",
-        merged_count
-    ));
-    save_character_data(&merged_skins)?;
+    // Cached mod details embed hero names from the old data.
+    if let Err(e) = crate::mod_db::db().clear_details() {
+        warn!("Failed to clear cached mod details: {}", e);
+    }
 
     on_progress("Refreshing cache...");
     refresh_cache();
 
-    let new_count = if merged_count > existing_count {
-        merged_count - existing_count
-    } else {
-        0
-    };
-
     info!(
-        "Update complete: {} total skins, {} new",
-        merged_count, new_count
+        "Update complete: {} total skins ({} before), {} new",
+        total_count, existing_count, new_count
     );
     Ok(new_count)
 }
@@ -855,7 +1105,7 @@ pub async fn check_for_update_on_launch() -> Option<usize> {
     // cause a retry on every subsequent launch until the interval passes.
     write_last_check_time();
 
-    match update_from_github_with_progress(|_msg| {}).await {
+    match update_character_data_with_progress(|_msg| {}).await {
         Ok(new_count) => {
             let total = get_all_character_data().len();
             if new_count > 0 {
@@ -940,4 +1190,41 @@ pub fn identify_mod_from_paths(file_paths: &[String]) -> Option<(String, String)
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_starsong_heroes_maps_ids_and_names() {
+        let data = serde_json::json!({ "revision": { "heroes": { "nodes": [
+            { "id": "1011", "name": "Bruce Banner", "playable": true, "items": { "nodes": [
+                { "id": "1011001", "name": "Bruce Banner" },
+                { "id": "1011300", "name": "Maestro" },
+                { "id": "ps1011504", "name": "Emerald Rage" },
+                { "id": "1011999", "name": null }
+            ] } },
+            { "id": "9999", "name": "英雄零", "playable": false, "items": { "nodes": [
+                { "id": "9999001", "name": "x" }
+            ] } },
+            { "id": "4017", "name": "Lobby Npc - Galacta", "playable": false, "items": { "nodes": [
+                { "id": "4017001", "name": "大厅npc-伽娜塔" }
+            ] } }
+        ] } } });
+        let skins = parse_starsong_heroes(&data).unwrap();
+        let rows: Vec<_> = skins
+            .iter()
+            .map(|s| (s.name.as_str(), s.skinid.as_str(), s.skin_name.as_str()))
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                ("Bruce Banner", "1011001", "Default"),
+                ("Bruce Banner", "1011300", "Maestro"),
+                ("Bruce Banner", "1011504", "Emerald Rage"),
+                ("Galacta", "4017001", "Default"),
+            ]
+        );
+    }
 }

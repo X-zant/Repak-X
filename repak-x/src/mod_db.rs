@@ -353,6 +353,12 @@ impl ModDb {
         Ok(())
     }
 
+    /// Drop every cached `ModDetails`. Their hero names come from the character
+    /// database, so they go stale when it changes; the next view re-reads the PAK.
+    pub fn clear_details(&self) -> rusqlite::Result<usize> {
+        self.conn.execute("DELETE FROM details_cache", [])
+    }
+
     /// One line for the startup banner: what the database holds.
     pub fn summary(&self) -> String {
         let count = |sql: &str| -> i64 { self.conn.query_row(sql, [], |r| r.get(0)).unwrap_or(0) };
@@ -797,6 +803,9 @@ mod tests {
         }
         assert!(db.cached_details("s1").is_none());
         assert!(db.cached_details("n0").is_some());
+
+        db.clear_details().unwrap();
+        assert!(db.cached_details("n0").is_none());
     }
 
     #[test]
