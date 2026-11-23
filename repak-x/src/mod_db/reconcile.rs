@@ -2,7 +2,7 @@
 //! Pure: no disk or database access, so it can be tested directly. The only I/O,
 //! reading a file's content id, comes in through a callback.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Rows missing from disk this long are deleted with their tags
 pub const ORPHAN_RETENTION_SECS: i64 = 7 * 24 * 3600;
@@ -59,7 +59,8 @@ pub enum Change {
 }
 
 /// `content_id` is only called for files that match no row by key, and only when
-/// some unmatched row has a content id to compare against.
+/// an unmatched row with a content id has the same stamp: a rename or move keeps
+/// size and mtime, so a file with a stamp no such row has cannot be a relink.
 pub fn reconcile(
     entries: &[DiskEntry],
     rows: &[Row],
@@ -101,18 +102,20 @@ pub fn reconcile(
     }
 
     let mut by_content: HashMap<&str, Vec<usize>> = HashMap::new();
+    let mut relink_stamps: HashSet<&str> = HashSet::new();
     for (i, row) in rows.iter().enumerate() {
         if let (false, Some(cid)) = (claimed[i], row.content_id.as_deref()) {
             by_content.entry(cid).or_default().push(i);
+            relink_stamps.insert(row.stamp.as_str());
         }
     }
 
     for entry in unmatched {
-        // With nothing to relink against, the content id is filled in later, off the scan
-        let cid = if by_content.is_empty() {
-            None
-        } else {
+        // Nothing it could relink to: the content id is filled in later, off the scan
+        let cid = if relink_stamps.contains(entry.stamp.as_str()) {
             content_id(entry)
+        } else {
+            None
         };
         let hit = cid
             .as_deref()
@@ -206,6 +209,16 @@ mod tests {
                 stamp: "s".into()
             }]
         );
+    }
+
+    #[test]
+    fn new_file_with_a_fresh_stamp_skips_the_content_read() {
+        // An orphan with a content id exists, but no file shares its stamp
+        let mut gone = row("u1", "gone", "s1", Some("c1"));
+        gone.orphaned_since = Some(0);
+        let mut never = |_: &DiskEntry| panic!("content id read for a file that cannot relink");
+        let changes = reconcile(&[entry("fresh", "s2")], &[gone], 0, &mut never);
+        assert!(matches!(changes.as_slice(), [Change::New { content_id: None, .. }]));
     }
 
     #[test]

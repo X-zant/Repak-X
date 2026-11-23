@@ -40,6 +40,20 @@ fn unix_now() -> i64 {
         .unwrap_or(0)
 }
 
+/// The file itself is bad (not SQLite, corrupt, or a newer schema), as opposed
+/// to a passing problem like a lock: only then is it set aside.
+fn is_unusable(e: &rusqlite::Error) -> bool {
+    match e {
+        rusqlite::Error::SqliteFailure(f, _) => matches!(
+            f.code,
+            rusqlite::ErrorCode::NotADatabase | rusqlite::ErrorCode::DatabaseCorrupt
+        ),
+        // What migrate() returns for a newer schema
+        rusqlite::Error::InvalidParameterName(_) => true,
+        _ => false,
+    }
+}
+
 /// The single owner of the database. Hold the guard only for the call.
 pub fn db() -> MutexGuard<'static, ModDb> {
     DB.lock()
@@ -225,7 +239,10 @@ impl ModDb {
     }
 
     fn open(path: &Path) -> rusqlite::Result<Self> {
-        let db = Self::with_conn(Connection::open(path)?);
+        let conn = Connection::open(path)?;
+        // Wait out a brief lock (backup tool, DB viewer) instead of failing the open
+        conn.busy_timeout(std::time::Duration::from_secs(2))?;
+        let db = Self::with_conn(conn);
         db.migrate()?;
         Ok(db)
     }
@@ -238,34 +255,40 @@ impl ModDb {
     }
 
     /// Never hard-fails: a corrupt or newer-schema file is set aside as
-    /// `mods.db.bad` and an empty database takes its place.
+    /// `mods.db.bad` and an empty database takes its place. Any other error
+    /// (locked, no access) leaves the file alone and runs in memory this session.
     fn open_or_rebuild(path: &Path) -> Self {
         if let Some(dir) = path.parent() {
             let _ = std::fs::create_dir_all(dir);
         }
-        match Self::open(path) {
+        let mut err = match Self::open(path) {
             Ok(db) => return db,
-            Err(e) => crate::ui_log::error(
-                LOG_SCOPE,
-                format!(
-                    "mods.db could not be opened ({}). Kept it as mods.db.bad and started an empty one: tags are lost",
-                    e
-                ),
-            ),
-        }
-        let _ = std::fs::rename(path, path.with_extension("db.bad"));
-        Self::open(path).unwrap_or_else(|e| {
+            Err(e) => e,
+        };
+        if is_unusable(&err) {
             crate::ui_log::error(
                 LOG_SCOPE,
                 format!(
-                    "Cannot create mods.db ({}). Tags and cached details are not saved this session",
-                    e
+                    "mods.db could not be opened ({}). Kept it as mods.db.bad and started an empty one: tags are lost",
+                    err
                 ),
             );
-            let db = Self::with_conn(Connection::open_in_memory().expect("in-memory SQLite"));
-            let _ = db.migrate();
-            db
-        })
+            let _ = std::fs::rename(path, path.with_extension("db.bad"));
+            match Self::open(path) {
+                Ok(db) => return db,
+                Err(e) => err = e,
+            }
+        }
+        crate::ui_log::error(
+            LOG_SCOPE,
+            format!(
+                "Cannot open mods.db ({}). Tags and cached details are not saved this session",
+                err
+            ),
+        );
+        let db = Self::with_conn(Connection::open_in_memory().expect("in-memory SQLite"));
+        let _ = db.migrate();
+        db
     }
 
     fn migrate(&self) -> rusqlite::Result<()> {
@@ -585,16 +608,17 @@ impl ModDb {
         files: &[PathBuf],
     ) -> rusqlite::Result<HashMap<PathBuf, Vec<String>>> {
         let mut entries = Vec::with_capacity(files.len());
-        let mut abs_by_key: HashMap<String, &PathBuf> = HashMap::new();
+        // By path, not key: an enabled and a disabled copy share a key but are two rows
+        let mut abs_by_path: HashMap<String, &PathBuf> = HashMap::new();
         for file in files {
             let Ok(rel) = file.strip_prefix(root) else {
                 continue;
             };
-            let key = path_key(rel);
-            abs_by_key.insert(key.clone(), file);
+            let path = slash_path(rel);
+            abs_by_path.insert(path.clone(), file);
             entries.push(DiskEntry {
-                key,
-                path: slash_path(rel),
+                key: path_key(rel),
+                path,
                 stamp: stamp(file),
             });
         }
@@ -681,16 +705,17 @@ impl ModDb {
         }
 
         let mut tags: HashMap<PathBuf, Vec<String>> = HashMap::new();
+        // Live rows' paths were just set to the scanned paths above
         let mut stmt = self.conn.prepare(
-            "SELECT m.path_key, t.tag FROM tags t JOIN mods m ON m.uid = t.uid
+            "SELECT m.path, t.tag FROM tags t JOIN mods m ON m.uid = t.uid
              WHERE m.orphaned_since IS NULL ORDER BY t.tag",
         )?;
         let pairs = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get(1)?)))?;
         for pair in pairs {
-            let (key, tag) = pair?;
-            match abs_by_key.get(&key) {
+            let (path, tag) = pair?;
+            match abs_by_path.get(&path) {
                 Some(abs) => tags.entry((*abs).clone()).or_default().push(tag),
-                None => warn!("Tag {} on a mod not in this scan: {}", tag, key),
+                None => warn!("Tag {} on a mod not in this scan: {}", tag, path),
             }
         }
         Ok(tags)
@@ -766,6 +791,41 @@ mod tests {
     }
 
     #[test]
+    fn enabled_and_disabled_copies_keep_their_own_tags() {
+        let root = Path::new("C:/mods");
+        let mut db = ModDb::open_in_memory();
+        let on = root.join("A.pak");
+        let off = root.join("A.bak_repak");
+        db.sync_library(root, &[on.clone(), off.clone()]);
+        for (path, tag) in [("A.pak", "one"), ("A.bak_repak", "two")] {
+            db.conn
+                .execute(
+                    "INSERT INTO tags SELECT uid, ?2 FROM mods WHERE path = ?1",
+                    params![path, tag],
+                )
+                .unwrap();
+        }
+        let tags = db.sync_library(root, &[on.clone(), off.clone()]);
+        assert_eq!(tags[&on], ["one"]);
+        assert_eq!(tags[&off], ["two"]);
+    }
+
+    #[test]
+    fn replacing_a_mod_carries_its_tags_over() {
+        let root = Path::new("C:/mods");
+        let mut db = ModDb::open_in_memory();
+        let (a, b) = (root.join("A.pak"), root.join("B.pak"));
+        db.sync_library(root, &[a.clone(), b.clone()]);
+        db.add_tags_at(&a, &["keep".into()]).unwrap();
+        db.add_tags_at(&b, &["old".into()]).unwrap();
+
+        // Update flow: A's new version lands on B's path
+        db.moved(&a, &b).unwrap();
+        assert_eq!(db.tags_at(&b), ["keep"]);
+        assert_eq!(db.sync_library(root, &[b.clone()])[&b], ["keep"]);
+    }
+
+    #[test]
     fn same_content_groups_pairs_live_rows_only() {
         // The only test using the global (in-memory under test) database
         db().conn
@@ -825,5 +885,17 @@ mod tests {
         drop(conn);
         let db = ModDb::open_or_rebuild(&path);
         assert!(db.cached_details("a").is_none());
+    }
+
+    #[test]
+    fn a_file_that_cannot_be_opened_is_left_alone() {
+        // A directory stands in for a locked or inaccessible file: not corrupt, just unopenable
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mods.db");
+        std::fs::create_dir(&path).unwrap();
+        let db = ModDb::open_or_rebuild(&path);
+        assert!(path.is_dir());
+        assert!(!dir.path().join("mods.db.bad").exists());
+        db.store_details("a", "{}").unwrap(); // in-memory fallback still works
     }
 }

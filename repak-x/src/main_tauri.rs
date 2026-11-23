@@ -811,15 +811,14 @@ async fn get_pak_files(state: State<'_, Arc<Mutex<AppState>>>) -> Result<Vec<Mod
                 }
             }
 
-            let custom_tags = mod_db::db().tags_at(path);
-
             mods.push(ModEntry {
                 path: path.to_path_buf(),
                 utoc_path,
                 enabled: is_enabled,
                 custom_name: None,
                 folder_id,
-                custom_tags,
+                // Filled from sync_library below, in one query
+                custom_tags: Vec::new(),
                 file_size,
                 modified_date,
                 priority,
