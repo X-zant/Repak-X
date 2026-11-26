@@ -42,7 +42,12 @@ pub fn reset_cancel_flag() {
 const STARSONG_GRAPHQL_URL: &str = "https://data.starsong.dev/marvel-rivals/graphql";
 
 /// Starsong asked for an identifiable User-Agent so it can trace its traffic.
-const STARSONG_USER_AGENT: &str = concat!("RepakX/", env!("CARGO_PKG_VERSION"));
+/// Only release CI on the main repo sets REPAKX_OFFICIAL_BUILD, so forks and
+/// local builds show up separately instead of being counted as Repak X.
+const STARSONG_USER_AGENT: &str = match option_env!("REPAKX_OFFICIAL_BUILD") {
+    Some(v) if !v.is_empty() => concat!("RepakX/", env!("CARGO_PKG_VERSION")),
+    _ => concat!("RepakX-unofficial/", env!("CARGO_PKG_VERSION")),
+};
 
 /// Part of the saved revision key: bump it whenever STARSONG_SKINS_QUERY changes,
 /// otherwise an unchanged pin would skip fetching the new fields.

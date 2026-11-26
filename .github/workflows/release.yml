@@ -188,6 +188,8 @@ jobs:
           # The NativeAOT UAssetTool library was already published into target/uassettool
           # above; tell build.rs not to rebuild it (it's bundled from there at package time).
           SKIP_UASSET_TOOL_BUILD: '1'
+          # Official User-Agent for the psylocke.gg API; empty (unofficial) on forks
+          REPAKX_OFFICIAL_BUILD: ${{ github.repository == 'X-zant/Repak-X' && '1' || '' }}
         run: |
           cargo build --release --target ${{ matrix.target }} --features custom-protocol
 
